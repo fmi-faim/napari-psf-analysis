@@ -1,11 +1,11 @@
 # napari-psf-analysis
 
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
-[![PyPI](https://img.shields.io/pypi/v/napari-psf-measures.svg?color=green)](https://pypi.org/projectnapari-psf-analysis)
-[![Python Version](https://img.shields.io/pypi/pyversions/napari-psf-measures.svg?color=green)](https://python.org)
-[![tests](https://github.com/fmi-faim/napari-psf-measures/workflows/tests/badge.svg)](https://github.com/fmi-faim/napari-psf-analysis/actions)
-[![codecov](https://codecov.io/gh/fmi-faim/napari-psf-measures/branch/main/graph/badge.svg)](https://codecov.io/gh/fmi-faim/napari-psf-analysis)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-psf-measures)](https://napari-hub.org/plugins/napari-psf-analysis)
+[![PyPI](https://img.shields.io/pypi/v/napari-psf-analysis.svg?color=green)](https://pypi.org/projectnapari-psf-analysis)
+[![Python Version](https://img.shields.io/pypi/pyversions/napari-psf-analysis.svg?color=green)](https://python.org)
+[![tests](https://github.com/fmi-faim/napari-psf-analysis/workflows/tests/badge.svg)](https://github.com/fmi-faim/napari-psf-analysis/actions)
+[![codecov](https://codecov.io/gh/fmi-faim/napari-psf-analysis/branch/main/graph/badge.svg)](https://codecov.io/gh/fmi-faim/napari-psf-analysis)
+[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-psf-analysis)](https://napari-hub.org/plugins/napari-psf-analysis)
 
 A plugin to analyze point spread functions (PSFs) of microscopes.
 
