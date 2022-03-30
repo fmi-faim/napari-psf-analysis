@@ -1,13 +1,13 @@
-# napari-psf-measures
+# napari-psf-analysis
 
-[![License](https://img.shields.io/pypi/l/napari-psf-measures.svg?color=green)](https://github.com/tibuch/napari-psf-measures/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari-psf-measures.svg?color=green)](https://pypi.org/project/napari-psf-measures)
+[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+[![PyPI](https://img.shields.io/pypi/v/napari-psf-measures.svg?color=green)](https://pypi.org/projectnapari-psf-analysis)
 [![Python Version](https://img.shields.io/pypi/pyversions/napari-psf-measures.svg?color=green)](https://python.org)
-[![tests](https://github.com/tibuch/napari-psf-measures/workflows/tests/badge.svg)](https://github.com/tibuch/napari-psf-measures/actions)
-[![codecov](https://codecov.io/gh/tibuch/napari-psf-measures/branch/main/graph/badge.svg)](https://codecov.io/gh/tibuch/napari-psf-measures)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-psf-measures)](https://napari-hub.org/plugins/napari-psf-measures)
+[![tests](https://github.com/fmi-faim/napari-psf-measures/workflows/tests/badge.svg)](https://github.com/fmi-faim/napari-psf-analysis/actions)
+[![codecov](https://codecov.io/gh/fmi-faim/napari-psf-measures/branch/main/graph/badge.svg)](https://codecov.io/gh/fmi-faim/napari-psf-analysis)
+[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-psf-measures)](https://napari-hub.org/plugins/napari-psf-analysis)
 
-A plugin to measure PSF characteristics.
+A plugin to analyze point spread functions (PSFs) of microscopes.
 
 ----------------------------------
 
@@ -23,9 +23,9 @@ https://napari.org/plugins/stable/index.html
 
 ## Installation
 
-You can install `napari-psf-measures` via [pip]:
+You can install `napari-psf-analysis` via [pip]:
 
-    pip install napari-psf-measures
+    pip install napari-psf-analysis
 
 
 
@@ -38,22 +38,16 @@ the coverage at least stays the same before you submit a pull request.
 ## License
 
 Distributed under the terms of the [BSD-3] license,
-"napari-psf-measures" is free and open source software
+"napari-psf-analysis" is free and open source software
 
 ## Issues
 
-If you encounter any problems, please [file an issue] along with a detailed description.
+If you encounter any problems, please [file an issue](https://github.com/fmi-faim/napari-psf-analysis/issues) along with a detailed description.
 
 [napari]: https://github.com/napari/napari
 [Cookiecutter]: https://github.com/audreyr/cookiecutter
 [@napari]: https://github.com/napari
-[MIT]: http://opensource.org/licenses/MIT
 [BSD-3]: http://opensource.org/licenses/BSD-3-Clause
-[GNU GPL v3.0]: http://www.gnu.org/licenses/gpl-3.0.txt
-[GNU LGPL v3.0]: http://www.gnu.org/licenses/lgpl-3.0.txt
-[Apache Software License 2.0]: http://www.apache.org/licenses/LICENSE-2.0
-[Mozilla Public License 2.0]: https://www.mozilla.org/media/MPL/2.0/index.txt
-[cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
 
 [napari]: https://github.com/napari/napari
 [tox]: https://tox.readthedocs.io/en/latest/
