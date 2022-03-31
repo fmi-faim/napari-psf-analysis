@@ -8,7 +8,6 @@ import yaml
 from magicgui import magic_factory
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from napari.settings import get_settings
-from napari_plugin_engine import napari_hook_implementation
 from qtpy.QtWidgets import (
     QComboBox,
     QDateEdit,
@@ -481,8 +480,3 @@ def set_config(config_path=pathlib.Path.home()):
             with open(config_pointer_path, "w") as yamlfile:
                 conf_dict = {"psf_analysis_config_file": str(config_path)}
                 yaml.safe_dump(conf_dict, yamlfile)
-
-
-@napari_hook_implementation
-def napari_experimental_provide_dock_widget():
-    return [set_config, PsfAnalysis]
