@@ -13,14 +13,6 @@ A plugin to analyze point spread functions (PSFs) of microscopes.
 
 This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookiecutter-napari-plugin] template.
 
-<!--
-Don't miss the full getting started guide to set up your new package:
-https://github.com/napari/cookiecutter-napari-plugin#getting-started
-
-and review the napari docs for plugin developers:
-https://napari.org/plugins/stable/index.html
--->
-
 ## Installation
 
 You can install `napari-psf-analysis` via [pip]:
@@ -46,6 +38,7 @@ If you encounter any problems, please [file an issue](https://github.com/fmi-fai
 
 [napari]: https://github.com/napari/napari
 [Cookiecutter]: https://github.com/audreyr/cookiecutter
+[cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
 [@napari]: https://github.com/napari
 [BSD-3]: http://opensource.org/licenses/BSD-3-Clause
 
