@@ -20,7 +20,7 @@ class PSFAnalysis:
         self,
         date: datetime.datetime,
         microscope: str,
-        magnification: float,
+        magnification: int,
         NA: float,
         spacing: np.array,
         patch_size: np.array,

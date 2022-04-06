@@ -18,6 +18,7 @@ from qtpy.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -118,11 +119,11 @@ class PsfAnalysis(QWidget):
             QLabel("Microscope", basic_settings), self.microscope
         )
 
-        self.magnification = QDoubleSpinBox(parent=basic_settings)
+        self.magnification = QSpinBox(parent=basic_settings)
         self.magnification.setMinimum(0)
-        self.magnification.setMaximum(10000.0)
-        self.magnification.setValue(100.0)
-        self.magnification.setSingleStep(10.0)
+        self.magnification.setMaximum(10000)
+        self.magnification.setValue(100)
+        self.magnification.setSingleStep(10)
         basic_settings.layout().addRow(
             QLabel("Magnification", basic_settings), self.magnification
         )
