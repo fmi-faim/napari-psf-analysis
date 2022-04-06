@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from napari.utils.notifications import show_info
 from scipy import optimize
-from skimage.feature import peak_local_max
 from skimage.filters import gaussian
 
 from ..utils.gaussians import gaussian_1d, gaussian_3d
@@ -54,26 +53,33 @@ class PSFAnalysis:
         return slice(int(np.round(mean - margin)), int(np.round(mean + margin)))
 
     def _localize_beads(self, img, points):
-        smooth = gaussian(img, 2, mode="constant", preserve_range=True)
-        coordinates = peak_local_max(
-            smooth, min_distance=max(1, int(self.spacing[-1] // 4))
-        )
-
         beads = []
         offsets = []
         margins = self.patch_size / self.spacing / 2
         for p in points:
 
-            closest_roi = coordinates[
-                np.argmin(np.linalg.norm(coordinates - p, axis=1))
-            ]
+            if np.all(p > margins) and np.all(p < (np.array(img.shape) - margins)):
+                z_search_slice = self._create_slice(p[0], margins[0])
+                y_search_slice = self._create_slice(p[1], margins[1])
+                x_search_slice = self._create_slice(p[2], margins[2])
+                subvolume = img[z_search_slice, y_search_slice, x_search_slice]
 
-            if np.all(closest_roi > margins) and np.all(
-                closest_roi < (np.array(img.shape) - margins)
-            ):
-                z_slice = self._create_slice(closest_roi[0], margins[0])
-                y_slice = self._create_slice(closest_roi[1], margins[1])
-                x_slice = self._create_slice(closest_roi[2], margins[2])
+                closest_roi = np.unravel_index(
+                    np.argmax(
+                        gaussian(subvolume, 2, mode="constant", preserve_range=True)
+                    ),
+                    subvolume.shape,
+                )
+
+                z_slice = self._create_slice(
+                    closest_roi[0] + z_search_slice.start, margins[0]
+                )
+                y_slice = self._create_slice(
+                    closest_roi[1] + y_search_slice.start, margins[1]
+                )
+                x_slice = self._create_slice(
+                    closest_roi[2] + x_search_slice.start, margins[2]
+                )
 
                 bead = img[z_slice, y_slice, x_slice]
                 offsets.append(tuple([z_slice.start, y_slice.start, x_slice.start]))
