@@ -389,6 +389,7 @@ class PsfAnalysis(QWidget):
                 rgb=True,
             )
             self._viewer.reset()
+            self._viewer.reset_view()
 
     def delete_measurements(self):
         idx = self._viewer.dims.current_step[0]
