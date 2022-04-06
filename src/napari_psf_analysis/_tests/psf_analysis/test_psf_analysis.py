@@ -126,7 +126,7 @@ def test_psf_measure():
     psf_measure = PSFAnalysis(
         date=datetime.datetime(2022, 3, 29),
         microscope="test",
-        magnification=1.0,
+        magnification=1,
         NA=1.0,
         spacing=np.array([1, 1, 1]),
         patch_size=np.array([30, 30, 30]),
@@ -171,8 +171,6 @@ def test_psf_measure():
     assert_almost_equal(results["r2_x"][0], 1)
     assert_almost_equal(results["r2_x"][0], 1)
     assert_almost_equal(results["r2_x"][0], 1)
-    assert_almost_equal(
-        results["SignalToBG"][0], np.mean(data[20, 19:22, 19:22]) / offset
-    )
+    assert_almost_equal(results["SignalToBG"][0], height / offset)
     assert results["XYpixelsize"][0] == 1
     assert results["Zspacing"][0] == 1
