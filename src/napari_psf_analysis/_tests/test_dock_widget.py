@@ -86,7 +86,7 @@ def test_psf_analysis_widget_basic(make_napari_viewer, tmpdir, capsys):
     csv_path = glob(str(tmp_path.join("*.csv")))[0]
     assert csv_path == str(
         tmp_path.join(
-            "PSFMeasurement_{}_data.tif_Microscope_100.0_1.4.csv".format(
+            "PSFMeasurement_{}_data.tif_Microscope_100_1.4.csv".format(
                 datetime.today().strftime("%Y-%m-%d")
             )
         )
@@ -127,7 +127,7 @@ def test_psf_analysis_widget_basic(make_napari_viewer, tmpdir, capsys):
     assert results.iloc[0][11] == 1.0
     assert results.iloc[0][12] == 1.0
     assert results.iloc[0][13] == 1.0
-    assert_almost_equal(results.iloc[0][14], np.mean(img[20, 19:22, 19:22]) / offset)
+    assert_almost_equal(results.iloc[0][14], height / offset)
     assert results.iloc[0][15] == 1.0
     assert results.iloc[0][16] == 1.0
     assert results.iloc[0][17] == "./data.tif_Bead_X20.0_Y20.0_Z20.0.png"
@@ -190,7 +190,7 @@ def test_psf_analysis_widget_advanced(make_napari_viewer, tmpdir, capsys):
     csv_path = glob(str(tmp_path.join("*.csv")))[0]
     assert csv_path == str(
         tmp_path.join(
-            "PSFMeasurement_{}_data.tif_Microscope_100.0_1.4.csv".format(
+            "PSFMeasurement_{}_data.tif_Microscope_100_1.4.csv".format(
                 datetime.today().strftime("%Y-%m-%d")
             )
         )
@@ -242,7 +242,7 @@ def test_psf_analysis_widget_advanced(make_napari_viewer, tmpdir, capsys):
     assert results.iloc[0][11] == 1.0
     assert results.iloc[0][12] == 1.0
     assert results.iloc[0][13] == 1.0
-    assert_almost_equal(results.iloc[0][14], np.mean(img[20, 19:22, 19:22]) / offset)
+    assert_almost_equal(results.iloc[0][14], height / offset)
     assert results.iloc[0][15] == 1.0
     assert results.iloc[0][16] == 1.0
     assert results.iloc[0][17] == 25
