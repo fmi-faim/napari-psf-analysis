@@ -97,7 +97,6 @@ class PsfAnalysis(QWidget):
 
         self.cbox_img = QComboBox(parent=basic_settings)
         self.cbox_point = QComboBox(parent=basic_settings)
-        self.fill_layer_boxes()
 
         basic_settings.layout().addRow(QLabel("Image", basic_settings), self.cbox_img)
         basic_settings.layout().addRow(
@@ -275,6 +274,7 @@ class PsfAnalysis(QWidget):
         self.layout().addWidget(self.save_button)
 
         self.cbox_img.currentIndexChanged.connect(self._img_selection_changed)
+        self.fill_layer_boxes()
 
     def select_save_dir(self):
         self.save_path.exec_()
@@ -284,6 +284,7 @@ class PsfAnalysis(QWidget):
         for layer in self._viewer.layers:
             if isinstance(layer, napari.layers.Image):
                 self.cbox_img.addItem(str(layer))
+                self._img_selection_changed()
             elif isinstance(layer, napari.layers.Points):
                 self.cbox_point.addItem(str(layer))
 
