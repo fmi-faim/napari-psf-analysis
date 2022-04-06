@@ -251,7 +251,7 @@ class PSFAnalysis:
                     background,
                 )
             )
-            c_s2bg.append(self._get_signal(bead, mu_z, mu_y, mu_x) / background)
+            c_s2bg.append(height / background)
             c_xyspacing.append(self.spacing[1])
             c_zspacing.append(self.spacing[0])
         results = pd.DataFrame(
