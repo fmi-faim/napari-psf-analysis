@@ -114,7 +114,7 @@ def test_get_signal():
 
 def test_psf_measure():
     height = 875
-    z, y, x = 20, 20, 20
+    z, y, x = 20.2, 20.3, 20.5
     sigma_z, sigma_y, sigma_x = 2, 1, 2
     offset = 150
 
@@ -168,9 +168,9 @@ def test_psf_measure():
     assert_almost_equal(results["FWHM_X"][0], sigma_x * 2 * np.sqrt(2 * np.log(2)))
     assert_almost_equal(results["FWHM_Y"][0], sigma_y * 2 * np.sqrt(2 * np.log(2)))
     assert_almost_equal(results["FWHM_Z"][0], sigma_z * 2 * np.sqrt(2 * np.log(2)))
-    assert_almost_equal(results["r2_x"][0], 1)
-    assert_almost_equal(results["r2_x"][0], 1)
-    assert_almost_equal(results["r2_x"][0], 1)
+    assert_almost_equal(results["r2_x"][0], 1, decimal=3)
+    assert_almost_equal(results["r2_x"][0], 1, decimal=3)
+    assert_almost_equal(results["r2_x"][0], 1, decimal=3)
     assert_almost_equal(results["SignalToBG"][0], height / offset)
     assert results["XYpixelsize"][0] == 1
     assert results["Zspacing"][0] == 1
