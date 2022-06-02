@@ -5,21 +5,18 @@ import numpy
 import numpy as np
 from matplotlib import pyplot as plt
 
-from .gaussians import gaussian_1d
+from .gaussians import gaussian_3d
 from .psf_lut import psf_lut
 
 
 def add_gaussian_fits(
     ax_x: matplotlib.axes.Axes,
     ax_y: matplotlib.axes.Axes,
-    mu_1: float,
-    sigma_1: float,
     samples_1: list,
-    mu_0: float,
-    sigma_0: float,
+    fit_1: list,
     samples_0: list,
+    fit_0: list,
     height: float,
-    offset: float,
     extent: tuple,
     scale: float = 4,
     aspect_ratio_x: float = 1,
@@ -34,22 +31,16 @@ def add_gaussian_fits(
             Figure x axis aligned plot.
         ax_y: matplotlib.axes.Axes
             Figure y axis aligned plot.
-        mu_1: float
-            Mean of the Gaussian plotted on ax_x.
-        sigma_1: float
-            Sigma of the Gaussian plotted on ax_x.
         samples_1: list[float]
             Measurements plotted on ax_x.
-        mu_0: float
-            Mean of the Gaussian plotted on ax_y.
-        sigma_0: float
-            Sigma of the Gaussian plotted on ax_y.
+        fit_1: list[float]
+            Fit corresponding to samples_1.
         samples_0: list[float]
             Measurements plotted on ax_y.
+        fit_0: list[float]
+            Fit corresponding to samples_0.
         height: float
             Height of the Gaussian.
-        offset: float
-            Offset of the Gaussian i.e. background signal value.
         extent: tuple(float, float)
             Extent of the fit range.
         scale: float
@@ -59,13 +50,8 @@ def add_gaussian_fits(
         aspect_ratio_y: float
             Anisotropy for ax_y.
     """
-    fit_range = np.linspace(extent[0], extent[1], num=200)
-    ax_x.plot(np.arange(len(samples_1)) + 0.5, samples_1, ".", color="black")
-    ax_x.plot(
-        fit_range + 0.5,
-        gaussian_1d(height, mu_1, sigma_1, offset)(fit_range),
-        color="gray",
-    )
+    ax_x.plot(np.arange(len(samples_1)), samples_1, ".", color="black")
+    ax_x.plot(np.arange(len(samples_1)), fit_1, color="gray")
     ax_x.yaxis.set_ticks_position("left")
     ax_x.set_ylim([0, scale * height])
     ax_x.set_xlim([0, extent[1]])
@@ -87,18 +73,15 @@ def add_gaussian_fits(
             linewidth=1,
         )
 
-    fit_range = np.linspace(0, extent[3] - extent[3] / (scale - 1), num=200)
-
     ax_y.plot(
         samples_0[: int(extent[3] - extent[3] / (scale - 1))],
-        -1
-        * (np.arange(len(samples_0)) + 0.5)[: int(extent[3] - extent[3] / (scale - 1))],
+        -1 * (np.arange(len(samples_0)))[: int(extent[3] - extent[3] / (scale - 1))],
         ".",
         color="black",
     )
     ax_y.plot(
-        gaussian_1d(height, mu_0, sigma_0, offset)(fit_range),
-        -1 * (fit_range + 0.5),
+        fit_0[: int(extent[3] - extent[3] / (scale - 1))],
+        -1 * (np.arange(len(samples_0)))[: int(extent[3] - extent[3] / (scale - 1))],
         color="gray",
     )
     for yline in hline_range:
@@ -163,6 +146,13 @@ def create_psf_overview(
     Returns:
         fig: matplotlib.pyplot.figure
     """
+    gaussian = gaussian_3d(*params)
+
+    z, y, x = np.meshgrid(
+        range(bead.shape[0]), range(bead.shape[1]), range(bead.shape[2]), indexing="ij"
+    )
+    fit = gaussian(z, y, x)
+
     fig = plt.figure(figsize=(10, 10))
 
     ax_xy = fig.add_axes([0, 0.5, 0.45, 0.45])
@@ -185,15 +175,12 @@ def create_psf_overview(
     add_gaussian_fits(
         ax_x,
         ax_y,
-        params[3],
-        params[6],
         bead[int(params[1]), int(params[2])],
-        params[2],
-        params[5],
+        fit[int(params[1]), int(params[2])],
         bead[int(params[1]), :, int(params[3])],
+        fit[int(params[1]), :, int(params[3])],
         params[0],
-        params[-1],
-        [0, bead.shape[2], 0, bead.shape[1]],
+        extent=tuple([0, bead.shape[2], 0, bead.shape[1]]),
         scale=5,
     )
     ax_x.set_xlabel("X")
@@ -215,15 +202,12 @@ def create_psf_overview(
     add_gaussian_fits(
         ax_x,
         ax_z,
-        params[3],
-        params[6],
         bead[int(params[1]), int(params[2])],
-        params[1],
-        params[4],
+        fit[int(params[1]), int(params[2])],
         bead[:, int(params[2]), int(params[3])],
+        fit[:, int(params[2]), int(params[3])],
         params[0],
-        params[-1],
-        [0, bead.shape[2], 0, bead.shape[0]],
+        extent=tuple([0, bead.shape[2], 0, bead.shape[0]]),
         scale=5,
         aspect_ratio_y=bead.shape[0] / bead.shape[2],
     )
@@ -246,15 +230,12 @@ def create_psf_overview(
     add_gaussian_fits(
         ax_z,
         ax_y,
-        params[1],
-        params[4],
         bead[:, int(params[2]), int(params[3])],
-        params[2],
-        params[5],
+        fit[:, int(params[2]), int(params[3])],
         bead[int(params[1]), :, int(params[3])],
+        fit[int(params[1]), :, int(params[3])],
         params[0],
-        params[-1],
-        [0, bead.shape[0], 0, bead.shape[1]],
+        extent=tuple([0, bead.shape[0], 0, bead.shape[1]]),
         scale=5,
         aspect_ratio_x=bead.shape[0] / bead.shape[1],
     )
