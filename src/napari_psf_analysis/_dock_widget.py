@@ -353,7 +353,7 @@ class PsfAnalysis(QWidget):
         else:
             point_data = point_layer.data
 
-        beads, fitted_params, self.results = m.analyze(
+        (beads, fitted_params, _, self.results,) = m.analyze(
             basename(img_layer.source.path), np.squeeze(img_layer.data), point_data
         )
 
@@ -361,14 +361,29 @@ class PsfAnalysis(QWidget):
         for i in range(len(beads)):
             bead = beads[i]
             params = fitted_params[i]
-            vmin = np.sqrt(params[-1])
+            vmin = np.sqrt(params[1])
             vmax = np.sqrt(bead.max())
             extent = [0, bead.shape[1], 0, bead.shape[2]]
             entry = self.results.iloc[i]
-            fwhm_measures = (entry["FWHM_Z"], entry["FWHM_Y"], entry["FWHM_X"])
+            pa1 = entry["PrincipalAxis_1"]
+            pa2 = entry["PrincipalAxis_2"]
+            pa3 = entry["PrincipalAxis_3"]
+            fwhm_x = entry["FWHM_X"]
+            fwhm_y = entry["FWHM_Y"]
+            fwhm_z = entry["FWHM_Z"]
 
             fig = create_psf_overview(
-                bead, params, vmin, vmax, extent, self.na, fwhm_measures
+                bead,
+                params,
+                vmin,
+                vmax,
+                extent,
+                (pa1, pa2, pa3),
+                (fwhm_x, fwhm_y, fwhm_z),
+                (pa1 // 200 + 1.5) * 100,
+                self.xy_pixelsize.value(),
+                self.z_spacing.value(),
+                datetime(*self.date.date().getDate()).strftime("%Y-%m-%d"),
             )
             canvas = FigureCanvas(fig)
             canvas.draw()  # draw the canvas, cache the renderer

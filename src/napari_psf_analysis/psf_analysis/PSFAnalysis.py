@@ -3,10 +3,9 @@ import datetime
 import numpy as np
 import pandas as pd
 from napari.utils.notifications import show_info
-from scipy import optimize
+from scipy.optimize import curve_fit
 from skimage.filters import gaussian
-
-from ..utils.gaussians import gaussian_1d, gaussian_3d
+from skimage.measure import centroid
 
 
 class PSFAnalysis:
@@ -96,57 +95,94 @@ class PSFAnalysis:
         return beads, offsets
 
     @staticmethod
-    def _guess_init_params(data):
-        data = data.astype(np.uint32)
-        total = data.sum()
-        Z, Y, X = np.indices(data.shape)
-        z = (Z * data).sum() / total
-        y = (Y * data).sum() / total
-        x = (X * data).sum() / total
-
-        z_slice = data[:, int(y), int(x)]
-        y_slice = data[int(z), :, int(x)]
-        x_slice = data[int(z), int(y), :]
-
-        sigma_z = np.sqrt(
-            np.abs((np.arange(z_slice.shape[0]) - z) ** 2 * z_slice).sum()
-            / z_slice.sum()
-        )
-        sigma_y = np.sqrt(
-            np.abs((np.arange(y_slice.shape[0]) - y) ** 2 * y_slice).sum()
-            / y_slice.sum()
-        )
-        sigma_x = np.sqrt(
-            np.abs((np.arange(x_slice.shape[0]) - x) ** 2 * x_slice).sum()
-            / x_slice.sum()
+    def ellipsoid3D(data, A, B, mu_x, mu_y, mu_z, cxx, cxy, cxz, cyy, cyz, czz):
+        inv = np.linalg.inv(
+            np.array([[cxx, cxy, cxz], [cxy, cyy, cyz], [cxz, cyz, czz]])
+            + np.identity(3) * 1e-8
         )
 
-        offset = np.quantile(data, 0.5)
-        height = data.max() - offset
-        return height, z, y, x, sigma_z, sigma_y, sigma_x, offset
+        return (
+            A
+            * np.exp(
+                -0.5
+                * (
+                    inv[0, 0] * (data[:, 2] - mu_x) ** 2
+                    + 2 * inv[0, 1] * (data[:, 2] - mu_x) * (data[:, 1] - mu_y)
+                    + 2 * inv[0, 2] * (data[:, 2] - mu_x) * (data[:, 0] - mu_z)
+                    + inv[1, 1] * (data[:, 1] - mu_y) ** 2
+                    + 2 * inv[1, 2] * (data[:, 1] - mu_y) * (data[:, 0] - mu_z)
+                    + inv[2, 2] * (data[:, 0] - mu_z) ** 2
+                )
+            )
+            + B
+        )
 
     @staticmethod
-    def _get_loss_function(data):
-        indices = np.indices(data.shape)
-
-        def loss(p):
-            return np.ravel(gaussian_3d(*p)(*indices) - data)
-
-        return loss
+    def get_estimates(data, spacing):
+        max_ = data.max()
+        mean_ = data.mean()
+        cz, cy, cx = centroid(data)
+        cz *= spacing[0]
+        cy *= spacing[1]
+        cx *= spacing[2]
+        cov = PSFAnalysis.get_cov_matrix(data, spacing)
+        return [
+            max_ - mean_,
+            mean_,
+            cx,
+            cy,
+            cz,
+            cov[0, 0],
+            cov[0, 1],
+            cov[0, 2],
+            cov[1, 1],
+            cov[1, 2],
+            cov[2, 2],
+        ]
 
     @staticmethod
-    def _fit_gaussian_3d(data):
-        loss_function = PSFAnalysis._get_loss_function(data)
-        params, _ = optimize.leastsq(
-            loss_function, PSFAnalysis._guess_init_params(data), full_output=False
+    def get_cov_matrix(img, spacing):
+        def cov(x, y, i):
+            return np.sum(x * y * i) / np.sum(i)
+
+        z, y, x = np.meshgrid(
+            np.arange(img.shape[0]) * spacing[0],
+            np.arange(img.shape[1]) * spacing[1],
+            np.arange(img.shape[2]) * spacing[2],
+            indexing="ij",
         )
-        return params
+        cen = centroid(img)
+        z = z.ravel() - cen[0] * spacing[0]
+        y = y.ravel() - cen[1] * spacing[1]
+        x = x.ravel() - cen[2] * spacing[2]
+
+        cxx = cov(x, x, img.ravel())
+        cyy = cov(y, y, img.ravel())
+        czz = cov(z, z, img.ravel())
+        cxy = cov(x, y, img.ravel())
+        cxz = cov(x, z, img.ravel())
+        cyz = cov(y, z, img.ravel())
+
+        C = np.array([[cxx, cxy, cxz], [cxy, cyy, cyz], [cxz, cyz, czz]])
+
+        return C
 
     @staticmethod
-    def _r_squared(sample, height, mu, sigma, offset):
-        gaussian = gaussian_1d(height, mu, sigma, offset)
-        fit = gaussian(np.arange(sample.size))
-        return 1 - np.sum((fit - sample) ** 2) / np.sum((fit - mu) ** 2)
+    def _fit_gaussian_3d(data, spacing):
+        zz = np.arange(data.shape[0]) * spacing[0]
+        yy = np.arange(data.shape[1]) * spacing[1]
+        xx = np.arange(data.shape[2]) * spacing[2]
+        z, y, x = np.meshgrid(zz, yy, xx, indexing="ij")
+        coords = np.stack([z.ravel(), y.ravel(), x.ravel()], -1)
+
+        popt, pcov = curve_fit(
+            PSFAnalysis.ellipsoid3D,
+            coords,
+            data.ravel(),
+            p0=PSFAnalysis.get_estimates(data, spacing),
+        )
+
+        return popt, pcov
 
     @staticmethod
     def _fwhm(sigma):
@@ -182,78 +218,120 @@ class PSFAnalysis:
                 Point coordinates.
         """
         beads, offsets = self._localize_beads(img, points)
-        fitted_params = [self._fit_gaussian_3d(bead) for bead in beads]
-        results = self._create_results_table(beads, fitted_params, img_name, offsets)
-        return beads, fitted_params, results
+        popts, pcovs = [], []
+        for bead in beads:
+            popt, pcov = self._fit_gaussian_3d(bead, self.spacing)
+            popts.append(popt)
+            pcovs.append(pcov)
 
-    def _create_results_table(self, beads, fitted_params, img_name, offsets):
+        results = self._create_results_table(
+            beads,
+            popts,
+            pcovs,
+            img_name,
+            offsets,
+        )
+        return (beads, popts, pcovs, results)
+
+    def _create_results_table(
+        self,
+        beads,
+        popts,
+        pcovs,
+        img_name,
+        offsets,
+    ):
         c_image_name = []
         c_date = []
         c_microscope = []
         c_mag = []
         c_na = []
+        c_amp = []
+        c_background = []
         c_x = []
         c_y = []
         c_z = []
         c_fwhm_x = []
         c_fwhm_y = []
         c_fwhm_z = []
-        c_r2_x = []
-        c_r2_y = []
-        c_r2_z = []
+        c_pa1 = []
+        c_pa2 = []
+        c_pa3 = []
         c_s2bg = []
         c_xyspacing = []
         c_zspacing = []
-        for params, bead, offset in zip(fitted_params, beads, offsets):
-            height = params[0]
-            background = params[-1]
-            mu_x = params[3]
-            mu_y = params[2]
-            mu_z = params[1]
-            sigma_x = params[6]
-            sigma_y = params[5]
-            sigma_z = params[4]
+        c_cxx = []
+        c_cxy = []
+        c_cxz = []
+        c_cyy = []
+        c_cyz = []
+        c_czz = []
+        c_sde_peak = []
+        c_sde_background = []
+        c_sde_mu_x = []
+        c_sde_mu_y = []
+        c_sde_mu_z = []
+        c_sde_cxx = []
+        c_sde_cxy = []
+        c_sde_cxz = []
+        c_sde_cyy = []
+        c_sde_cyz = []
+        c_sde_czz = []
+        for popt, pcov, bead, offset in zip(popts, pcovs, beads, offsets):
+            perr = np.sqrt(np.diag(pcov))
+            height = popt[0]
+            background = popt[1]
+            mu_x = popt[2]
+            mu_y = popt[3]
+            mu_z = popt[4]
+            cxx = popt[5]
+            cxy = popt[6]
+            cxz = popt[7]
+            cyy = popt[8]
+            cyz = popt[9]
+            czz = popt[10]
+            cov = np.array([[cxx, cxy, cxz], [cxy, cyy, cyz], [cxz, cyz, czz]])
+            eigval, eigvec = np.linalg.eig(cov)
+            pa3, pa2, pa1 = np.sort(np.sqrt(eigval))
+            fwhm_x = self._fwhm(np.sqrt(cxx))
+            fwhm_y = self._fwhm(np.sqrt(cyy))
+            fwhm_z = self._fwhm(np.sqrt(czz))
             c_image_name.append(img_name)
             c_date.append(self.date.strftime("%Y-%m-%d"))
             c_microscope.append(self.microscope)
             c_mag.append(self.magnification)
             c_na.append(self.NA)
+            c_amp.append(height)
+            c_background.append(background)
             c_x.append(mu_x + offset[2])
             c_y.append(mu_y + offset[1])
             c_z.append(mu_z + offset[0])
-            c_fwhm_x.append(abs(self._fwhm(sigma_x)) * self.spacing[2])
-            c_fwhm_y.append(abs(self._fwhm(sigma_y)) * self.spacing[1])
-            c_fwhm_z.append(abs(self._fwhm(sigma_z)) * self.spacing[0])
-            c_r2_x.append(
-                self._r_squared(
-                    bead[int(np.round(mu_z)), int(np.round(mu_y))],
-                    height,
-                    mu_x,
-                    sigma_x,
-                    background,
-                )
-            )
-            c_r2_y.append(
-                self._r_squared(
-                    bead[int(np.round(mu_z)), :, int(np.round(mu_x))],
-                    height,
-                    mu_y,
-                    sigma_y,
-                    background,
-                )
-            )
-            c_r2_z.append(
-                self._r_squared(
-                    bead[:, int(np.round(mu_y)), int(np.round(mu_x))],
-                    height,
-                    mu_z,
-                    sigma_z,
-                    background,
-                )
-            )
+            c_fwhm_x.append(fwhm_x)
+            c_fwhm_y.append(fwhm_y)
+            c_fwhm_z.append(fwhm_z)
+            c_pa1.append(self._fwhm(pa1))
+            c_pa2.append(self._fwhm(pa2))
+            c_pa3.append(self._fwhm(pa3))
             c_s2bg.append(height / background)
             c_xyspacing.append(self.spacing[1])
             c_zspacing.append(self.spacing[0])
+            c_cxx.append(cxx)
+            c_cxy.append(cxy)
+            c_cxz.append(cxz)
+            c_cyy.append(cyy)
+            c_cyz.append(cyz)
+            c_czz.append(czz)
+            c_sde_peak.append(perr[0])
+            c_sde_background.append(perr[1])
+            c_sde_mu_x.append(perr[2])
+            c_sde_mu_y.append(perr[3])
+            c_sde_mu_z.append(perr[4])
+            c_sde_cxx.append(perr[5])
+            c_sde_cxy.append(perr[6])
+            c_sde_cxz.append(perr[7])
+            c_sde_cyy.append(perr[8])
+            c_sde_cyz.append(perr[9])
+            c_sde_czz.append(perr[10])
         results = pd.DataFrame(
             {
                 "ImageName": c_image_name,
@@ -261,18 +339,37 @@ class PSFAnalysis:
                 "Microscope": c_microscope,
                 "Magnification": c_mag,
                 "NA": c_na,
+                "Amplitude": c_amp,
+                "Background": c_background,
                 "X": c_x,
                 "Y": c_y,
                 "Z": c_z,
                 "FWHM_X": c_fwhm_x,
                 "FWHM_Y": c_fwhm_y,
                 "FWHM_Z": c_fwhm_z,
-                "r2_x": c_r2_x,
-                "r2_y": c_r2_y,
-                "r2_z": c_r2_z,
+                "PrincipalAxis_1": c_pa1,
+                "PrincipalAxis_2": c_pa2,
+                "PrincipalAxis_3": c_pa3,
                 "SignalToBG": c_s2bg,
                 "XYpixelsize": c_xyspacing,
                 "Zspacing": c_zspacing,
+                "cov_xx": c_cxx,
+                "cov_xy": c_cxy,
+                "cov_xz": c_cxz,
+                "cov_yy": c_cyy,
+                "cov_yz": c_cyz,
+                "cov_zz": c_czz,
+                "sde_peak": c_sde_peak,
+                "sde_background": c_sde_background,
+                "sde_X": c_sde_mu_x,
+                "sde_Y": c_sde_mu_y,
+                "sde_Z": c_sde_mu_z,
+                "sde_cov_xx": c_sde_cxx,
+                "sde_cov_xy": c_sde_cxy,
+                "sde_cov_xz": c_sde_cxz,
+                "sde_cov_yy": c_sde_cyy,
+                "sde_cov_yz": c_sde_cyz,
+                "sde_cov_zz": c_sde_czz,
             }
         )
         return results
