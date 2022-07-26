@@ -106,9 +106,7 @@ def test_psf_measure():
     czz = popts[0][10]
     cov = np.array([[cxx, cxy, cxz], [cxy, cyy, cyz], [cxz, cyz, czz]])
     eigval, eigvec = np.linalg.eig(cov)
-    print(eigval)
     pa3, pa2, pa1 = np.sort(np.sqrt(eigval))
-    print(pa1, pa2, pa3)
 
     assert_almost_equal(result_height, height, decimal=0)
     assert_almost_equal(result_background, offset, decimal=0)
