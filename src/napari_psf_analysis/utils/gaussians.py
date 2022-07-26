@@ -1,23 +1,6 @@
 import numpy as np
 
 
-def gaussian_1d(height: float = 1, mu: float = 0, sigma: float = 2, offset: float = 0):
-    """
-    Return a parametrized 1D Gaussian function.
-
-    Parameters:
-        height: float
-            Distance between the lowest and peak value of the Gaussian.
-        mu: float
-            Expected value of the Gaussian.
-        sigma: float
-            Width of the Gaussian.
-        offset: float
-            Shifts the Gaussian `up` or `down` i.e. the background signal.
-    """
-    return lambda x: offset + height * np.exp(-((x - mu) ** 2 / (2 * sigma ** 2)))
-
-
 def gaussian_3d(
     height: float = 1,
     mu_z: float = 0,

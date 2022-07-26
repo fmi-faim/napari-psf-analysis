@@ -2,25 +2,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_almost_equal
 
-from napari_psf_analysis.utils.gaussians import gaussian_1d, gaussian_3d
-
-
-@pytest.mark.parametrize("height, mu, sigma, offset", [(3, 50, 2, 5), (1, 20, 1, 0)])
-def test_gaussian_1d(height, mu, sigma, offset):
-    x = np.linspace(0, 100, 10000)
-
-    gaussian = gaussian_1d(height=height, mu=mu, sigma=sigma, offset=offset)
-
-    y = gaussian(x)
-
-    assert_almost_equal(x[np.argmax(y)], mu, decimal=2)
-    assert_almost_equal(y.min(), offset, decimal=2)
-    assert_almost_equal(y.max() - offset, height, decimal=2)
-    fwhm_end = x[::-1][np.argmax(y[::-1] > (offset + height / 2))]
-    fwhm_start = x[np.argmax(y > (offset + height / 2))]
-    assert_almost_equal(
-        (fwhm_end - fwhm_start) / (2 * np.sqrt(2 * np.log(2))), sigma, decimal=2
-    )
+from napari_psf_analysis.utils.gaussians import gaussian_3d
 
 
 @pytest.mark.parametrize(

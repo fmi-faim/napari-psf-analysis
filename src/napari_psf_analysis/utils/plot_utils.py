@@ -1,130 +1,22 @@
-from datetime import datetime
-
-import matplotlib.axes
 import numpy
 import numpy as np
 from matplotlib import pyplot as plt
 
-from .gaussians import gaussian_1d
-from .psf_lut import psf_lut
 
-
-def add_gaussian_fits(
-    ax_x: matplotlib.axes.Axes,
-    ax_y: matplotlib.axes.Axes,
-    mu_1: float,
-    sigma_1: float,
-    samples_1: list,
-    mu_0: float,
-    sigma_0: float,
-    samples_0: list,
-    height: float,
-    offset: float,
-    extent: tuple,
-    scale: float = 4,
-    aspect_ratio_x: float = 1,
-    aspect_ratio_y: float = 1,
-):
-    """
-    Add overlays with the measured data points and fitted Gaussians for X, Y,
-    and Z dimensions.
-
-    Parameters:
-        ax_x: matplotlib.axes.Axes
-            Figure x axis aligned plot.
-        ax_y: matplotlib.axes.Axes
-            Figure y axis aligned plot.
-        mu_1: float
-            Mean of the Gaussian plotted on ax_x.
-        sigma_1: float
-            Sigma of the Gaussian plotted on ax_x.
-        samples_1: list[float]
-            Measurements plotted on ax_x.
-        mu_0: float
-            Mean of the Gaussian plotted on ax_y.
-        sigma_0: float
-            Sigma of the Gaussian plotted on ax_y.
-        samples_0: list[float]
-            Measurements plotted on ax_y.
-        height: float
-            Height of the Gaussian.
-        offset: float
-            Offset of the Gaussian i.e. background signal value.
-        extent: tuple(float, float)
-            Extent of the fit range.
-        scale: float
-            Relative scaling of the plot.
-        aspect_ratio_x: float
-            Anisotropy for ax_x.
-        aspect_ratio_y: float
-            Anisotropy for ax_y.
-    """
-    fit_range = np.linspace(extent[0], extent[1], num=200)
-    ax_x.plot(np.arange(len(samples_1)) + 0.5, samples_1, ".", color="black")
-    ax_x.plot(
-        fit_range + 0.5,
-        gaussian_1d(height, mu_1, sigma_1, offset)(fit_range),
-        color="gray",
-    )
-    ax_x.yaxis.set_ticks_position("left")
-    ax_x.set_ylim([0, scale * height])
-    ax_x.set_xlim([0, extent[1]])
-
-    order = int(1)
-    while height // order > 10:
-        order = int(order * 10)
-
-    hline_range = range(1 * order, int((height // order + 2) * order), order)
-    ax_x.set_yticks(hline_range)
-    ax_x.set_xticks([])
-    ax_x.tick_params(axis="y", direction="in", pad=-35, grid_alpha=0.3, colors="gray")
-    for yline in hline_range:
-        ax_x.plot(
-            [12 * aspect_ratio_x, extent[1]],
-            [yline, yline],
-            "gray",
-            alpha=0.3,
-            linewidth=1,
-        )
-
-    fit_range = np.linspace(0, extent[3] - extent[3] / (scale - 1), num=200)
-
-    ax_y.plot(
-        samples_0[: int(extent[3] - extent[3] / (scale - 1))],
-        -1
-        * (np.arange(len(samples_0)) + 0.5)[: int(extent[3] - extent[3] / (scale - 1))],
-        ".",
-        color="black",
-    )
-    ax_y.plot(
-        gaussian_1d(height, mu_0, sigma_0, offset)(fit_range),
-        -1 * (fit_range + 0.5),
-        color="gray",
-    )
-    for yline in hline_range:
-        ax_y.plot(
-            [yline, yline],
-            [-1 * (12 * aspect_ratio_y), -1 * (extent[3] - extent[3] / (scale - 1))],
-            "gray",
-            alpha=0.3,
-            linewidth=1,
-        )
-    ax_y.set_ylim([-extent[3], 0])
-    ax_y.set_xlim([0, scale * height])
-    ax_y.set_xticks(hline_range)
-    ax_y.set_yticks([])
-    ax_y.tick_params(
-        axis="x",
-        direction="in",
-        pad=-35,
-        grid_alpha=0.3,
-        labeltop=True,
-        labelbottom=False,
-        labelrotation=-90,
-        top=True,
-        bottom=False,
-        colors="gray",
-    )
+def get_parameters(popt):
+    A = popt[0]
+    B = popt[1]
+    mu_x = popt[2]
+    mu_y = popt[3]
+    mu_z = popt[4]
+    cxx = popt[5]
+    cxy = popt[6]
+    cxz = popt[7]
+    cyy = popt[8]
+    cyz = popt[9]
+    czz = popt[10]
+    cov = np.array([[cxx, cxy, cxz], [cxy, cyy, cyz], [cxz, cyz, czz]])
+    return A, B, mu_x, mu_y, mu_z, cov
 
 
 def create_psf_overview(
@@ -133,9 +25,12 @@ def create_psf_overview(
     vmin: float,
     vmax: float,
     extent: tuple,
-    NA: float,
-    fwhm_measures: list,
-    cmap: matplotlib.colors.ListedColormap = psf_lut(),
+    principal_axes: list,
+    fwhm: list,
+    bbox_size: int,
+    xy_spacing: int,
+    z_spacing: int,
+    date: str,
 ):
     """
     Plots a single PSF with fitted Gaussian.
@@ -152,181 +47,478 @@ def create_psf_overview(
             Display range maximum.
         extent: tuple
             Of the axes.
-        NA: float
-            Numerical aperture with which the bead was imaged.
-        fwhm_measures: list[float]
+        principal_axes: list[float]
             Full width half maxima measurements of the fitted Gaussian
-            (z, y, x).
-        cmap: matplotlib.colors.ListedColormap
-            Colormap used to dispaly the bead image.
+            (pa1, pa2, pa3).
+        fwhm: list[float]
+            Full width half maxima measurements of the fitted Gaussian
+            (x, y, z).
+        bbox_size: int
+            Size of the bounding box.
+        xy_spacing: int
+            Pixel spacing in xy.
+        z_spacing: int
+            Z-slice spacing.
+        date: str
+            Date as string.
 
     Returns:
         fig: matplotlib.pyplot.figure
     """
+    height, background, mu_x, mu_y, mu_z, estimated_cov = get_parameters(params)
+    eigval, eigvec = np.linalg.eig(estimated_cov)
     fig = plt.figure(figsize=(10, 10))
 
-    ax_xy = fig.add_axes([0, 0.5, 0.45, 0.45])
-    ax_yz = fig.add_axes([0.5, 0.5, 0.45, 0.45])
-    ax_zx = fig.add_axes([0, 0, 0.45, 0.45])
+    ax_xy = fig.add_axes([0.025, 0.525, 0.45, 0.45])
+    ax_yz = fig.add_axes([0.525, 0.525, 0.45, 0.45])
+    ax_zx = fig.add_axes([0.025, 0.025, 0.45, 0.45])
+
+    ax_X = fig.add_axes([0.24, 0.49, 0.02, 0.02])
+    ax_X.text(0.5, 0.5, "X", fontsize=14, ha="center", va="center")
+    ax_X.axis("off")
+    ax_Y = fig.add_axes([0.49, 0.74, 0.02, 0.02])
+    ax_Y.text(0.5, 0.5, "Y", fontsize=14, ha="center", va="center")
+    ax_Y.axis("off")
+    ax_Z = fig.add_axes([0.477, 0.24, 0.02, 0.02])
+    ax_Z.text(0.5, 0.5, "Z", fontsize=14, ha="center", va="center")
+    ax_Z.axis("off")
+    ax_Z1 = fig.add_axes([0.73, 0.50, 0.02, 0.02])
+    ax_Z1.text(0.5, 0.5, "Z", fontsize=14, ha="center", va="center")
+    ax_Z1.axis("off")
+
+    cx = mu_x / xy_spacing + 0.5
+    cy = mu_y / xy_spacing + 0.5
+    cz = (mu_z + z_spacing) / xy_spacing + 0.5
 
     ax_xy.imshow(
         np.sqrt(np.max(bead, axis=0)),
-        cmap=cmap,
+        cmap="turbo",
         vmin=vmin,
         vmax=vmax,
         extent=extent,
         interpolation="nearest",
+        origin="lower",
     )
-    ax_xy.axis("off")
-    ax_x = fig.add_axes([0, 0.5, 0.45, 0.45])
-    ax_x.patch.set_alpha(0.0)
-    ax_y = fig.add_axes([0, 0.5, 0.45, 0.45])
-    ax_y.patch.set_alpha(0.0)
-    add_gaussian_fits(
-        ax_x,
-        ax_y,
-        params[3],
-        params[6],
-        bead[int(params[1]), int(params[2])],
-        params[2],
-        params[5],
-        bead[int(params[1]), :, int(params[3])],
-        params[0],
-        params[-1],
-        [0, bead.shape[2], 0, bead.shape[1]],
-        scale=5,
+    x_fwhm, y_fwhm, z_fwhm = fwhm
+    dx = (x_fwhm / 2) / xy_spacing
+    dy = (y_fwhm / 2) / xy_spacing
+    ax_xy.plot(
+        [cx - dx, cx + dx],
+        [
+            bead.shape[2] / 4,
+        ]
+        * 2,
+        linewidth=4,
+        c="white",
+        solid_capstyle="butt",
     )
-    ax_x.set_xlabel("X")
-    ax_x.set_ylabel("Y")
+    ax_xy.plot([cx - dx, cx - dx], [cy - dx, bead.shape[2] / 4], "--", c="white")
+    ax_xy.plot([cx + dx, cx + dx], [cy - dx, bead.shape[2] / 4], "--", c="white")
+    ax_xy.text(
+        cx,
+        bead.shape[2] / 4.5,
+        f"{int(np.round(x_fwhm))}nm",
+        ha="center",
+        va="top",
+        fontsize=15,
+        bbox=dict(facecolor="white", alpha=1, linewidth=0),
+    )
+
+    ax_xy.plot(
+        [
+            bead.shape[1] / 4,
+        ]
+        * 2,
+        [cy - dy, cy + dy],
+        linewidth=4,
+        c="white",
+        solid_capstyle="butt",
+    )
+    ax_xy.plot([bead.shape[1] / 4, cx - dx], [cy - dy, cy - dy], "--", color="white")
+    ax_xy.plot([bead.shape[1] / 4, cx - dx], [cy + dy, cy + dy], "--", color="white")
+    ax_xy.text(
+        bead.shape[2] / 4.5,
+        cy,
+        f"{int(np.round(y_fwhm))}nm",
+        ha="right",
+        va="center",
+        fontsize=15,
+        bbox=dict(facecolor="white", alpha=1, linewidth=0),
+    )
+
+    from matplotlib_scalebar.scalebar import ScaleBar
+
+    scalebar = ScaleBar(xy_spacing, "nm", fixed_value=500, location="lower " "right")
+    ax_xy.add_artist(scalebar)
+    ax_xy.set_xticks([])
+    ax_xy.set_yticks([])
 
     ax_zx.imshow(
         np.sqrt(np.max(bead, axis=1)),
-        cmap=cmap,
+        cmap="turbo",
         vmin=vmin,
         vmax=vmax,
         extent=extent,
         interpolation="nearest",
+        origin="lower",
     )
-    ax_zx.axis("off")
-    ax_x = fig.add_axes([0, 0, 0.45, 0.45])
-    ax_x.patch.set_alpha(0.0)
-    ax_z = fig.add_axes([0, 0, 0.45, 0.45])
-    ax_z.patch.set_alpha(0.0)
-    add_gaussian_fits(
-        ax_x,
-        ax_z,
-        params[3],
-        params[6],
-        bead[int(params[1]), int(params[2])],
-        params[1],
-        params[4],
-        bead[:, int(params[2]), int(params[3])],
-        params[0],
-        params[-1],
-        [0, bead.shape[2], 0, bead.shape[0]],
-        scale=5,
-        aspect_ratio_y=bead.shape[0] / bead.shape[2],
+    dz = (z_fwhm / 2) / xy_spacing
+    ax_zx.plot(
+        [
+            bead.shape[1] / 4,
+        ]
+        * 2,
+        [cz - dz, cz + dz],
+        linewidth=4,
+        c="white",
+        solid_capstyle="butt",
     )
-    ax_x.set_xlabel("X")
-    ax_x.set_ylabel("Z")
+    ax_zx.plot([bead.shape[1] / 4, cx - dx], [cz - dz, cz - dz], "--", color="white")
+    ax_zx.plot([bead.shape[1] / 4, cx - dx], [cz + dz, cz + dz], "--", color="white")
+    ax_zx.text(
+        bead.shape[1] / 4.5,
+        cz,
+        f"{int(np.round(z_fwhm))}nm",
+        ha="right",
+        va="center",
+        fontsize=15,
+        bbox=dict(facecolor="white", alpha=1, linewidth=0),
+    )
+    ax_zx.plot(
+        [cx - dx, cx + dx],
+        [
+            bead.shape[2] / 4,
+        ]
+        * 2,
+        linewidth=4,
+        c="white",
+        solid_capstyle="butt",
+    )
+    ax_zx.plot([cx - dx, cx - dx], [bead.shape[1] / 4, cz - dz], "--", color="white")
+    ax_zx.plot([cx + dx, cx + dx], [bead.shape[1] / 4, cz - dz], "--", color="white")
+    ax_zx.text(
+        cx,
+        bead.shape[2] / 4.5,
+        f"{int(np.round(x_fwhm))}nm",
+        ha="center",
+        va="top",
+        fontsize=15,
+        bbox=dict(facecolor="white", alpha=1, linewidth=0),
+    )
+
+    ax_zx.set_xticks([])
+    ax_zx.set_yticks([])
 
     ax_yz.imshow(
         np.sqrt(np.max(bead, axis=2)).T,
-        cmap=cmap,
+        cmap="turbo",
         vmin=vmin,
         vmax=vmax,
         extent=extent,
         interpolation="nearest",
+        origin="lower",
     )
-    ax_yz.axis("off")
-    ax_z = fig.add_axes([0.5, 0.5, 0.45, 0.45])
-    ax_z.patch.set_alpha(0.0)
-    ax_y = fig.add_axes([0.5, 0.5, 0.45, 0.45])
-    ax_y.patch.set_alpha(0.0)
-    add_gaussian_fits(
-        ax_z,
-        ax_y,
-        params[1],
-        params[4],
-        bead[:, int(params[2]), int(params[3])],
-        params[2],
-        params[5],
-        bead[int(params[1]), :, int(params[3])],
-        params[0],
-        params[-1],
-        [0, bead.shape[0], 0, bead.shape[1]],
-        scale=5,
-        aspect_ratio_x=bead.shape[0] / bead.shape[1],
+    ax_yz.plot(
+        [
+            bead.shape[1] / 4,
+        ]
+        * 2,
+        [cy - dy, cy + dy],
+        linewidth=4,
+        c="white",
+        solid_capstyle="butt",
     )
-    ax_z.set_xlabel("Z")
-    ax_z.set_ylabel("Y")
+    ax_yz.plot([bead.shape[1] / 4, cz - dz], [cy - dy, cy - dy], "--", color="white")
+    ax_yz.plot([bead.shape[1] / 4, cz - dz], [cy + dy, cy + dy], "--", color="white")
+    ax_yz.text(
+        bead.shape[2] / 4.5,
+        cy,
+        f"{int(np.round(y_fwhm))}nm",
+        ha="right",
+        va="center",
+        fontsize=15,
+        bbox=dict(facecolor="white", alpha=1, linewidth=0),
+    )
+    ax_yz.plot(
+        [cz - dz, cz + dz],
+        [
+            bead.shape[1] / 4,
+        ]
+        * 2,
+        linewidth=4,
+        c="white",
+        solid_capstyle="butt",
+    )
+    ax_yz.plot([cz - dz, cz - dz], [bead.shape[1] / 4, cy - dy], "--", color="white")
+    ax_yz.plot([cz + dz, cz + dz], [bead.shape[1] / 4, cy - dy], "--", color="white")
+    ax_yz.text(
+        cz,
+        bead.shape[1] / 4.5,
+        f"{int(np.round(z_fwhm))}nm",
+        ha="center",
+        va="top",
+        fontsize=15,
+        bbox=dict(facecolor="white", alpha=1, linewidth=0),
+    )
 
-    ax_text = fig.add_axes([0.5, 0, 0.45, 0.45])
+    ax_yz.set_xticks([])
+    ax_yz.set_yticks([])
+
+    ax_3D = fig.add_axes(
+        [0.525, 0.025, 0.45, 0.45], projection="3d", computed_zorder=False
+    )
+    ax_text = fig.add_axes([0.525, 0.025, 0.45, 0.45])
+    ax_3D.axis("off")
+    ax_3D.set_xlim(-bbox_size, bbox_size)
+    ax_3D.set_ylim(-bbox_size, bbox_size)
+    ax_3D.set_zlim(-bbox_size, bbox_size)
+    ax_3D.plot(
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [-0.5 * bbox_size, 0.5 * bbox_size],
+        [-bbox_size, -bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [0.5 * bbox_size, -0.5 * bbox_size],
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [-bbox_size, -bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [-bbox_size, bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [0.5 * bbox_size, -0.5 * bbox_size],
+        [bbox_size, bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [0.5 * bbox_size, -0.5 * bbox_size],
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [bbox_size, bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [0.5 * bbox_size, -0.5 * bbox_size],
+        [-bbox_size, -bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [0.5 * bbox_size, -0.5 * bbox_size],
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [-bbox_size, -bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [-bbox_size, bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [-bbox_size, bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [0.5 * bbox_size, -0.5 * bbox_size],
+        [0, 0],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [0, 0],
+        [-bbox_size, bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [0.5 * bbox_size, -0.5 * bbox_size],
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [0, 0],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [0, 0],
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [-bbox_size, bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [0.5 * bbox_size, -0.5 * bbox_size],
+        [0, 0],
+        [-bbox_size, -bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+    ax_3D.plot(
+        [0, 0],
+        [-0.5 * bbox_size, 0.5 * bbox_size],
+        [-bbox_size, -bbox_size],
+        c="#444444",
+        linewidth=1,
+    )
+
+    ax_3D.plot([-0.5 * bbox_size, 0], [0, 0], [0, 0], "--", c="#444444", linewidth=1)
+    ax_3D.plot([0, 0], [0, 0.5 * bbox_size], [0, 0], "--", c="#444444", linewidth=1)
+    ax_3D.plot([0, 0], [0, 0], [0, -bbox_size], "--", c="#444444", linewidth=1)
+
+    neg = -eigvec[:, 0] * principal_axes[0] / 2.0
+    pos = eigvec[:, 0] * principal_axes[0] / 2.0
+    ax_3D.plot(
+        [neg[0], pos[0]],
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [neg[2], pos[2]],
+        color="#0061B5",
+        linestyle=(0, (1, 0.5)),
+        linewidth=3,
+    )
+    ax_3D.plot(
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [neg[1], pos[1]],
+        [neg[2], pos[2]],
+        color="#0061B5",
+        linestyle=(0, (1, 0.5)),
+        linewidth=3,
+    )
+    ax_3D.plot(
+        [neg[0], pos[0]],
+        [neg[1], pos[1]],
+        [-bbox_size, -bbox_size],
+        color="#0061B5",
+        linestyle=(0, (1, 0.5)),
+        linewidth=3,
+    )
+    neg = -eigvec[:, 1] * principal_axes[1] / 2.0
+    pos = eigvec[:, 1] * principal_axes[1] / 2.0
+    ax_3D.plot(
+        [neg[0], pos[0]],
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [neg[2], pos[2]],
+        color="#D81B60",
+        linestyle=(0, (1, 0.5)),
+        linewidth=3,
+    )
+    ax_3D.plot(
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [neg[1], pos[1]],
+        [neg[2], pos[2]],
+        color="#D81B60",
+        linestyle=(0, (1, 0.5)),
+        linewidth=3,
+    )
+    ax_3D.plot(
+        [neg[0], pos[0]],
+        [neg[1], pos[1]],
+        [-bbox_size, -bbox_size],
+        color="#D81B60",
+        linestyle=(0, (1, 0.5)),
+        linewidth=3,
+    )
+    neg = -eigvec[:, 2] * principal_axes[2] / 2.0
+    pos = eigvec[:, 2] * principal_axes[2] / 2.0
+    ax_3D.plot(
+        [neg[0], pos[0]],
+        [0.5 * bbox_size, 0.5 * bbox_size],
+        [neg[2], pos[2]],
+        color="#03A919",
+        linestyle=(0, (1, 0.5)),
+        linewidth=3,
+    )
+    ax_3D.plot(
+        [-0.5 * bbox_size, -0.5 * bbox_size],
+        [neg[1], pos[1]],
+        [neg[2], pos[2]],
+        color="#03A919",
+        linestyle=(0, (1, 0.5)),
+        linewidth=3,
+    )
+    ax_3D.plot(
+        [neg[0], pos[0]],
+        [neg[1], pos[1]],
+        [-bbox_size, -bbox_size],
+        color="#03A919",
+        linestyle=(0, (1, 0.5)),
+        linewidth=3,
+    )
+
+    ax_3D.text3D(-0.5 * bbox_size, -0.64 * bbox_size, 0, "Z", ha="center", va="center")
+    ax_3D.text3D(0, -0.6 * bbox_size, -1.05 * bbox_size, "X", ha="center", va="center")
+    ax_3D.text3D(0.6 * bbox_size, 0, -bbox_size, "Y", ha="center", va="center")
+
+    neg = -eigvec[:, 0] * principal_axes[0] / 2.0
+    pos = eigvec[:, 0] * principal_axes[0] / 2.0
+    ax_3D.quiver3D(
+        0, 0, 0, *neg, linewidth=3, zorder=2, arrow_length_ratio=0, color="#0061B5"
+    )
+    ax_3D.quiver3D(
+        0, 0, 0, *pos, linewidth=3, zorder=2, arrow_length_ratio=0, color="#0061B5"
+    )
+    neg = -eigvec[:, 1] * principal_axes[1] / 2.0
+    pos = eigvec[:, 1] * principal_axes[1] / 2.0
+    ax_3D.quiver3D(
+        0, 0, 0, *neg, linewidth=3, zorder=2, arrow_length_ratio=0, color="#D81B60"
+    )
+    ax_3D.quiver3D(
+        0, 0, 0, *pos, linewidth=3, zorder=2, arrow_length_ratio=0, color="#D81B60"
+    )
+    neg = -eigvec[:, 2] * principal_axes[2] / 2.0
+    pos = eigvec[:, 2] * principal_axes[2] / 2.0
+    ax_3D.quiver3D(
+        0, 0, 0, *neg, linewidth=3, zorder=2, arrow_length_ratio=0, color="#03A919"
+    )
+    ax_3D.quiver3D(
+        0, 0, 0, *pos, linewidth=3, zorder=2, arrow_length_ratio=0, color="#03A919"
+    )
+
     ax_text.axis("off")
-    red_font = {"color": "red", "size": 15}
-    ax_text.text(0.0, 0.40, datetime.today().strftime("%d-%m-%Y"), fontdict=red_font)
+    ax_text.set_xlim(0, 100)
+    ax_text.set_ylim(0, 100)
     ax_text.text(
-        0.0,
-        0.34,
-        "FWHM lateral: X = {:.0f}nm, Y = {:.0f}nm".format(
-            fwhm_measures[2], fwhm_measures[1]
-        ),
-        fontdict=red_font,
+        5,
+        90,
+        f"{int(np.round(principal_axes[0]))}nm",
+        color="#0061B5",
+        fontsize=16,
+        weight="bold",
     )
     ax_text.text(
-        0.0,
-        0.28,
-        "FWHM lateral average = {:.0f}nm".format(
-            (fwhm_measures[2] + fwhm_measures[1]) / 2
-        ),
-        fontdict=red_font,
+        5,
+        83,
+        f"{int(np.round(principal_axes[1]))}nm",
+        color="#D81B60",
+        fontsize=16,
+        weight="bold",
     )
-    ax_text.text(0.0, 0.22, f"FWHM axial = {fwhm_measures[0]:.0f}nm", fontdict=red_font)
-    blue_font = {"color": "blue", "size": 15}
-    ax_text.text(0.0, 0.16, "Theoretical values", fontdict=blue_font)
-    if NA == 1.4:
-        ax_text.text(
-            0.0, 0.1, "NA1.4 Oil FWHMl 188nm - FWHMa 696nm", fontdict=blue_font
-        )
-    elif NA == 1.32:
-        ax_text.text(
-            0.0, 0.1, "NA1.32 Oil FWHMl 199nm - FWHMa 781nm", fontdict=blue_font
-        )
-    elif NA == 1.3:
-        ax_text.text(
-            0.0, 0.1, "NA1.3 Oil FWHMl 202nm - FWHMa 803nm", fontdict=blue_font
-        )
-        ax_text.text(
-            0.0, 0.04, "NA1.3 Glyc FWHMl 202nm - FWHMa 771nm", fontdict=blue_font
-        )
-    elif NA == 0.95:
-        ax_text.text(
-            0.0, 0.1, "NA0.95 Air FWHMl 276nm - FWHMa 996nm", fontdict=blue_font
-        )
-    elif NA == 1.2:
-        ax_text.text(
-            0.0, 0.1, "NA1.2 Water FWHMl 213nm - FWHMa 799nm", fontdict=blue_font
-        )
-    elif NA == 0.8:
-        ax_text.text(
-            0.0, 0.1, "NA0.8 Glyc FWHMl 328nm - FWHMa 2038nm", fontdict=blue_font
-        )
-        ax_text.text(
-            0.0, 0.04, "NA0.8 Air FWHMl 383nm - FWHMa 1403nm", fontdict=blue_font
-        )
-    elif NA == 0.75:
-        ax_text.text(
-            0.0, 0.1, "NA0.75 Air FWHMl 350nm - FWHMa 1598nm", fontdict=blue_font
-        )
-    elif NA == 1.45:
-        ax_text.text(
-            0.0, 0.1, "NA1.45 Oil FWHMl 181nm - FWHMa 649nm", fontdict=blue_font
-        )
-    elif NA == 1.25:
-        ax_text.text(
-            0.0, 0.1, "NA1.25 Oil FWHMl 210nm - FWHMa 873nm", fontdict=blue_font
-        )
-    else:
-        ax_text.text(0.0, 0.1, "Values not determined yet.", fontdict=blue_font)
+    ax_text.text(
+        5,
+        76,
+        f"{int(np.round(principal_axes[2]))}nm",
+        color="#03A919",
+        fontsize=16,
+        weight="bold",
+    )
+    ax_text.text(25, 2, f"Acquisition date: {date}.", fontsize=16)
+
+    ax_text.plot([0, 0, 100, 100, 0], [0, 100, 100, 0, 0], color="black")
 
     return fig
