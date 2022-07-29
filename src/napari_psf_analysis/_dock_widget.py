@@ -403,7 +403,7 @@ class PsfAnalysis(QWidget):
                 interpolation="bicubic",
                 rgb=True,
             )
-            self._viewer.reset()
+            self._viewer.dims.set_point(0, 0)
             self._viewer.reset_view()
 
     def delete_measurements(self):
