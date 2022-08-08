@@ -1,3 +1,20 @@
+# import pathlib
+# from datetime import datetime
+# from glob import glob
+#
+# import numpy as np
+# import pandas as pd
+# import yaml
+# from numpy.testing import assert_almost_equal
+# from qtpy.QtWidgets import QLineEdit
+# from tifffile import imwrite
+#
+# from napari_psf_analysis._dock_widget import (
+#     PsfAnalysis,
+#     get_microscopes,
+#     get_output_path,
+# )
+# from napari_psf_analysis.utils.gaussians import gaussian_3d
 #
 #
 # def test_psf_analysis_widget_discard_point(make_napari_viewer, tmpdir, capsys):
@@ -13,7 +30,7 @@
 #     img = gaussian(Z, Y, X)
 #
 #     tmp_path = tmpdir.mkdir("test").join("data.tif")
-#     imsave(tmp_path, img)
+#     imwrite(tmp_path, img)
 #     viewer.open(str(tmp_path))
 #     viewer.add_points(np.array([[z, y, x]]))
 #
@@ -42,7 +59,7 @@
 #
 #     tmp_path = tmpdir.mkdir("test")
 #     input_path = tmp_path.join("data.tif")
-#     imsave(input_path, img)
+#     imwrite(input_path, img)
 #     viewer.open(str(input_path))
 #     viewer.add_points(np.array([[z, y, x]]))
 #
@@ -159,7 +176,7 @@
 #
 #     tmp_path = tmpdir.mkdir("test")
 #     input_path = tmp_path.join("data.tif")
-#     imsave(input_path, img)
+#     imwrite(input_path, img)
 #     viewer.open(str(input_path))
 #     viewer.add_points(np.array([[z, y, x]]))
 #
