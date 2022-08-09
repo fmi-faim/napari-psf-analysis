@@ -365,19 +365,26 @@ class PsfAnalysis(QWidget):
         if point_layer is None:
             return
 
-        if img_layer.data.ndim > 3:
-            channel_axis = 0
-            for i, a in enumerate(img_layer.data.shape):
-                if a == 1:
-                    channel_axis = i
+        if len(img_layer.data.shape) != 3:
+            raise NotImplementedError(
+                f"Only 3 dimensional data is "
+                f"supported. Your data has {(img_layer.data.shape)} dimensions."
+            )
 
-            point_data = np.delete(point_layer.data, channel_axis, 1)
+        from bfio.bfio import NapariReader
+
+        if isinstance(img_layer.data, NapariReader):
+            img_data = np.transpose(img_layer.data.br.read(), [2, 0, 1])
         else:
-            point_data = point_layer.data
+            img_data = img_layer.data
 
-        (beads, fitted_params, _, self.results,) = m.analyze(
-            basename(img_layer.source.path), np.squeeze(img_layer.data), point_data
-        )
+        point_data = point_layer.data
+        (
+            beads,
+            fitted_params,
+            _,
+            self.results,
+        ) = m.analyze(basename(img_layer.source.path), img_data, point_data)
 
         self.bead_imgs = {}
         for i in range(len(beads)):
