@@ -397,11 +397,25 @@ class PsfAnalysis(QWidget):
             self.bead_imgs[bead_name] = image
 
         if len(self.bead_imgs) > 0:
+            measurement_stack = np.stack(
+                [self.bead_imgs[k] for k in self.bead_imgs.keys()]
+            )
+            bead_scale = self._viewer.layers[self.cbox_img.currentText()].scale
+            bead_shape = self._viewer.layers[self.cbox_img.currentText()].data.shape
+
+            measurement_scale = np.array(
+                [
+                    bead_scale[0],
+                    bead_scale[1] / measurement_stack.shape[1] * bead_shape[1],
+                    bead_scale[1] / measurement_stack.shape[1] * bead_shape[1],
+                ]
+            )
             self._viewer.add_image(
-                np.stack([self.bead_imgs[k] for k in self.bead_imgs.keys()]),
+                measurement_stack,
                 name="Analyzed Beads",
                 interpolation="bicubic",
                 rgb=True,
+                scale=measurement_scale,
             )
             self._viewer.dims.set_point(0, 0)
             self._viewer.reset_view()
