@@ -63,10 +63,40 @@ With the three summary images:
 ---
 
 ## Installation
+We recommend installation into a fresh conda environment.
 
+### 1. Install napari
+```shell
+conda create -y -n psf-analysis -c conda-forge python=3.9
+
+conda activate psf-analysis
+
+python -m pip install "napari[all]"
+```
+
+### 2. Install napari-aicsimageio and bioformats
+Required if you want to open other files than `.tif` e.g. `.stk. `.
+
+__Note:__ See [napari-aicsimageio](https://www.napari-hub.
+org/plugins/napari-aicsimageio) for more information about opening images.
+```shell
+conda install -c conda-forge openjdk
+
+conda deactivate
+conda activate psf-analysis
+
+python -m pip install "bfio[bioformats]"
+python -m pip install "aicsimageio[all]"
+python -m pip install napari-aicsimageio
+```
+
+### 3. Install napari-psf-analysis
 You can install `napari-psf-analysis` via [pip]:
 
-    pip install napari-psf-analysis
+```shell
+python -m pip install napari-psf-analysis
+```
+
 
 
 ## Contributing
