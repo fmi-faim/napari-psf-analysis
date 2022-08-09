@@ -127,6 +127,11 @@ class PsfAnalysis(QWidget):
             QLabel("Magnification", basic_settings), self.magnification
         )
 
+        self.objective_id = QLineEdit("obj_1")
+        basic_settings.layout().addRow(
+            QLabel("Objective ID", basic_settings), self.objective_id
+        )
+
         self.na = QDoubleSpinBox(parent=basic_settings)
         self.na.setMinimum(0.0)
         self.na.setMaximum(1.7)
@@ -196,11 +201,6 @@ class PsfAnalysis(QWidget):
         self.mounting_medium = QLineEdit()
         advanced_settings.layout().addRow(
             QLabel("Mounting Medium", advanced_settings), self.mounting_medium
-        )
-
-        self.objective_id = QLineEdit()
-        advanced_settings.layout().addRow(
-            QLabel("Objective ID", advanced_settings), self.objective_id
         )
 
         self.operator = QLineEdit()
