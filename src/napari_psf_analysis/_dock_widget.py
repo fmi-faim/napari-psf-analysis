@@ -75,6 +75,8 @@ class PsfAnalysis(QWidget):
     def __init__(self, napari_viewer, parent=None):
         super().__init__(parent=parent)
         self._viewer = napari_viewer
+        napari_viewer.layers.events.inserted.connect(self._layer_inserted)
+        napari_viewer.layers.events.removed.connect(self._layer_removed)
         napari_viewer.layers.selection.events.changed.connect(self._on_selection)
 
         self.bead_imgs = None
@@ -273,6 +275,7 @@ class PsfAnalysis(QWidget):
         self.save_button.clicked.connect(self.save_measurements)
         self.layout().addWidget(self.save_button)
 
+        self.current_img_index = -1
         self.cbox_img.currentIndexChanged.connect(self._img_selection_changed)
         self.fill_layer_boxes()
 
@@ -289,15 +292,34 @@ class PsfAnalysis(QWidget):
                 self.cbox_point.addItem(str(layer))
 
     def _img_selection_changed(self):
-        for layer in self._viewer.layers:
-            if str(layer) == self.cbox_img.itemText(self.cbox_img.currentIndex()):
-                self.date.setDate(datetime.fromtimestamp(getctime(layer.source.path)))
+        if self.current_img_index != self.cbox_img.currentIndex():
+            self.current_img_index = self.cbox_img.currentIndex()
+            for layer in self._viewer.layers:
+                if str(layer) == self.cbox_img.itemText(self.cbox_img.currentIndex()):
+                    self.date.setDate(
+                        datetime.fromtimestamp(getctime(layer.source.path))
+                    )
+
+    def _layer_inserted(self, event):
+        if isinstance(event.value, napari.layers.Image):
+            self.cbox_img.insertItem(self.cbox_img.count() + 1, str(event.value))
+        elif isinstance(event.value, napari.layers.Points):
+            self.cbox_point.insertItem(self.cbox_point.count() + 1, str(event.value))
+
+    def _layer_removed(self, event):
+        if isinstance(event.value, napari.layers.Image):
+            items = [self.cbox_img.itemText(i) for i in range(self.cbox_img.count())]
+            self.cbox_img.removeItem(items.index(str(event.value)))
+            self.changed_manually = False
+            self.current_img_index = -1
+            self._img_selection_changed()
+        elif isinstance(event.value, napari.layers.Points):
+            items = [
+                self.cbox_point.itemText(i) for i in range(self.cbox_point.count())
+            ]
+            self.cbox_point.removeItem(items.index(str(event.value)))
 
     def _on_selection(self, event):
-        self.cbox_img.clear()
-        self.cbox_point.clear()
-        self.fill_layer_boxes()
-
         if self._viewer.layers.selection.active is not None:
             self.delete_measurement.setEnabled(
                 self._viewer.layers.selection.active.name == "Analyzed Beads"
