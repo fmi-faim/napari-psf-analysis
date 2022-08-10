@@ -77,8 +77,7 @@ python -m pip install "napari[all]"
 ### 2. Install napari-aicsimageio and bioformats
 Required if you want to open other files than `.tif` e.g. `.stk. `.
 
-__Note:__ See [napari-aicsimageio](https://www.napari-hub.
-org/plugins/napari-aicsimageio) for more information about opening images.
+__Note:__ See [napari-aicsimageio](https://www.napari-hub.org/plugins/napari-aicsimageio) for more information about opening images.
 ```shell
 conda install -c conda-forge openjdk
 
@@ -97,6 +96,21 @@ You can install `napari-psf-analysis` via [pip]:
 python -m pip install napari-psf-analysis
 ```
 
+### 4. Optional `Set Config`
+You can provide a config yaml file with the available microscope names and a default save directory.
+This will change the `Microscope` text field to a drop down menu and change the default save directory.
+
+`example_config.yaml`
+```yaml
+microscopes:
+  - TIRF
+  - Zeiss Z1
+output_path: "D:\\psf_analysis\\measurements"
+```
+
+To use this config navigate to `Plugins > napari-psf-analysis > Set Config` and select the config file.
+
+__Note:__ The save path is OS specific.
 
 
 ## Contributing
