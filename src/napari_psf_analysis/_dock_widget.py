@@ -383,6 +383,8 @@ class PsfAnalysis(QWidget):
             beads,
             fitted_params,
             _,
+            fitted_params_2d,
+            _,
             self.results,
         ) = m.analyze(basename(img_layer.source.path), img_data, point_data)
 
@@ -400,6 +402,9 @@ class PsfAnalysis(QWidget):
             fwhm_x = entry["FWHM_X"]
             fwhm_y = entry["FWHM_Y"]
             fwhm_z = entry["FWHM_Z"]
+            fwhm_x_2d = entry["FWHM_X_2D"]
+            fwhm_y_2d = entry["FWHM_Y_2D"]
+            version = entry["version"]
 
             fig = create_psf_overview(
                 bead,
@@ -409,10 +414,12 @@ class PsfAnalysis(QWidget):
                 extent,
                 (pa1, pa2, pa3),
                 (fwhm_x, fwhm_y, fwhm_z),
+                (fwhm_x_2d, fwhm_y_2d),
                 (pa1 // 200 + 1.5) * 100,
                 self.xy_pixelsize.value(),
                 self.z_spacing.value(),
                 datetime(*self.date.date().getDate()).strftime("%Y-%m-%d"),
+                version,
             )
             canvas = FigureCanvas(fig)
             canvas.draw()  # draw the canvas, cache the renderer

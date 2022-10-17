@@ -27,10 +27,12 @@ def create_psf_overview(
     extent: tuple,
     principal_axes: list,
     fwhm: list,
+    fwhm_2d: list,
     bbox_size: int,
     xy_spacing: int,
     z_spacing: int,
     date: str,
+    version: str,
 ):
     """
     Plots a single PSF with fitted Gaussian.
@@ -53,6 +55,9 @@ def create_psf_overview(
         fwhm: list[float]
             Full width half maxima measurements of the fitted Gaussian
             (x, y, z).
+        fwhm_2d: list[float]
+            Full width half maxima measurements of the fitted Gaussian
+            (x, y).
         bbox_size: int
             Size of the bounding box.
         xy_spacing: int
@@ -61,6 +66,8 @@ def create_psf_overview(
             Z-slice spacing.
         date: str
             Date as string.
+        version: str
+            Plugin version
 
     Returns:
         fig: matplotlib.pyplot.figure
@@ -100,6 +107,7 @@ def create_psf_overview(
         origin="lower",
     )
     x_fwhm, y_fwhm, z_fwhm = fwhm
+    x_fwhm_2d, y_fwhm_2d = fwhm_2d
     dx = (x_fwhm / 2) / xy_spacing
     dy = (y_fwhm / 2) / xy_spacing
     ax_xy.plot(
@@ -142,6 +150,16 @@ def create_psf_overview(
         f"{int(np.round(y_fwhm))}nm",
         ha="right",
         va="center",
+        fontsize=15,
+        bbox=dict(facecolor="white", alpha=1, linewidth=0),
+    )
+    ax_xy.text(
+        0,
+        0,
+        f"2D FWHM Fit [nm]:\n"
+        f"(x, y) = ({int(np.round(x_fwhm_2d))}, {int(np.round(y_fwhm_2d))})",
+        ha="left",
+        va="bottom",
         fontsize=15,
         bbox=dict(facecolor="white", alpha=1, linewidth=0),
     )
@@ -518,6 +536,7 @@ def create_psf_overview(
         weight="bold",
     )
     ax_text.text(25, 2, f"Acquisition date: {date}.", fontsize=16)
+    ax_text.text(-110, -4, f"napari-psf-analysis: v{version}", fontsize=11)
 
     ax_text.plot([0, 0, 100, 100, 0], [0, 100, 100, 0, 0], color="black")
 

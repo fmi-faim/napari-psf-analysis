@@ -1,6 +1,7 @@
 import datetime
 
 import numpy as np
+import pkg_resources
 import pytest
 from numpy.testing import assert_almost_equal, assert_array_equal
 
@@ -85,7 +86,7 @@ def test_psf_measure():
     assert_array_equal(beads[0], data[5:-5, 5:-5, 5:-5])
     assert_almost_equal(offsets[0], tuple([5, 5, 5]))
 
-    (beads, popts, pcovs, results) = psf_measure.analyze(
+    (beads, popts, pcovs, popts_2d, pcovs_2d, results) = psf_measure.analyze(
         "test_img", data, np.array([[z, y, x]])
     )
 
@@ -108,6 +109,17 @@ def test_psf_measure():
     eigval, eigvec = np.linalg.eig(cov)
     pa3, pa2, pa1 = np.sort(np.sqrt(eigval))
 
+    result_height_2d = popts_2d[0][0]
+    result_background_2d = popts_2d[0][1]
+    result_mu_x_2d = popts_2d[0][2]
+    result_mu_y_2d = popts_2d[0][3]
+    cxx_2d = popts_2d[0][4]
+    cxy_2d = popts_2d[0][5]
+    cyy_2d = popts_2d[0][6]
+    cov_2d = np.array([[cxx_2d, cxy_2d], [cxy_2d, cyy_2d]])
+    eigval_2d, eigvec_2d = np.linalg.eig(cov_2d)
+    pa2_2d, pa1_2d = np.sort(np.sqrt(eigval_2d))
+
     assert_almost_equal(result_height, height, decimal=0)
     assert_almost_equal(result_background, offset, decimal=0)
     assert_almost_equal(result_mu_z, z - offsets[0][0], decimal=7)
@@ -117,6 +129,16 @@ def test_psf_measure():
     assert_almost_equal(pa2, sigma_y, decimal=7)
     assert_almost_equal(pa3, sigma_x, decimal=7)
 
+    # This will not be exactly the simulated numbers, because the fit is
+    # performed on the int(np.round(mu_z)) bead-plane even if the bead is
+    # at a z sub-pixel location.
+    assert_almost_equal(result_height_2d, 870, decimal=0)
+    assert_almost_equal(result_background_2d, offset, decimal=0)
+    assert_almost_equal(result_mu_y_2d, y - offsets[0][1], decimal=7)
+    assert_almost_equal(result_mu_x_2d, x - offsets[0][2], decimal=7)
+    assert_almost_equal(pa1_2d, sigma_y, decimal=7)
+    assert_almost_equal(pa2_2d, sigma_x, decimal=7)
+
     assert results["ImageName"][0] == "test_img"
     assert results["Date"][0] == "2022-03-29"
     assert results["Microscope"][0] == "test"
@@ -125,9 +147,18 @@ def test_psf_measure():
     assert_almost_equal(results["X"][0], x)
     assert_almost_equal(results["Y"][0], y)
     assert_almost_equal(results["Z"][0], z)
+    assert_almost_equal(results["X_2D"][0], x)
+    assert_almost_equal(results["Y_2D"][0], y)
     assert_almost_equal(results["FWHM_X"][0], sigma_x * 2 * np.sqrt(2 * np.log(2)))
     assert_almost_equal(results["FWHM_Y"][0], sigma_y * 2 * np.sqrt(2 * np.log(2)))
     assert_almost_equal(results["FWHM_Z"][0], sigma_z * 2 * np.sqrt(2 * np.log(2)))
+    fwhm_x = sigma_x * 2 * np.sqrt(2 * np.log(2))
+    assert_almost_equal(results["FWHM_X_2D"][0], fwhm_x)
+    fwhm_y = sigma_y * 2 * np.sqrt(2 * np.log(2))
+    assert_almost_equal(results["FWHM_Y_2D"][0], fwhm_y)
     assert_almost_equal(results["SignalToBG"][0], height / offset)
+    assert_almost_equal(results["SignalToBG_2D"][0], height / offset, decimal=1)
     assert results["XYpixelsize"][0] == 1
     assert results["Zspacing"][0] == 1
+    version = pkg_resources.get_distribution("napari_psf_analysis").version
+    assert results["version"][0] == version
