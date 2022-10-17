@@ -2,6 +2,7 @@ import datetime
 
 import numpy as np
 import pandas as pd
+import pkg_resources
 from napari.utils.notifications import show_info
 from scipy.optimize import curve_fit
 from skimage.filters import gaussian
@@ -118,6 +119,41 @@ class PSFAnalysis:
         )
 
     @staticmethod
+    def ellipsoid2D(data, A, B, mu_x, mu_y, cxx, cxy, cyy):
+        inv = np.linalg.inv(np.array([[cxx, cxy], [cxy, cyy]]) + np.identity(2) * 1e-8)
+
+        return (
+            A
+            * np.exp(
+                -0.5
+                * (
+                    inv[0, 0] * (data[:, 1] - mu_x) ** 2
+                    + 2 * inv[0, 1] * (data[:, 1] - mu_x) * (data[:, 0] - mu_y)
+                    + inv[1, 1] * (data[:, 0] - mu_y) ** 2
+                )
+            )
+            + B
+        )
+
+    @staticmethod
+    def get_estimates_2D(data, spacing):
+        max_ = data.max()
+        mean_ = data.mean()
+        cy, cx = centroid(data)
+        cy *= spacing[1]
+        cx *= spacing[2]
+        cov = PSFAnalysis.get_cov_matrix_2D(data, spacing)
+        return [
+            max_ - mean_,
+            mean_,
+            cx,
+            cy,
+            cov[0, 0],
+            cov[0, 1],
+            cov[1, 1],
+        ]
+
+    @staticmethod
     def get_estimates(data, spacing):
         max_ = data.max()
         mean_ = data.mean()
@@ -139,6 +175,28 @@ class PSFAnalysis:
             cov[1, 2],
             cov[2, 2],
         ]
+
+    @staticmethod
+    def get_cov_matrix_2D(img, spacing):
+        def cov(x, y, i):
+            return np.sum(x * y * i) / np.sum(i)
+
+        y, x = np.meshgrid(
+            np.arange(img.shape[0]) * spacing[0],
+            np.arange(img.shape[1]) * spacing[1],
+            indexing="ij",
+        )
+        cen = centroid(img)
+        y = y.ravel() - cen[0] * spacing[0]
+        x = x.ravel() - cen[1] * spacing[1]
+
+        cxx = cov(x, x, img.ravel())
+        cyy = cov(y, y, img.ravel())
+        cxy = cov(x, y, img.ravel())
+
+        C = np.array([[cxx, cxy], [cxy, cyy]])
+
+        return C
 
     @staticmethod
     def get_cov_matrix(img, spacing):
@@ -185,6 +243,22 @@ class PSFAnalysis:
         return popt, pcov
 
     @staticmethod
+    def _fit_gaussian_2d(data, spacing):
+        yy = np.arange(data.shape[0]) * spacing[1]
+        xx = np.arange(data.shape[1]) * spacing[2]
+        y, x = np.meshgrid(yy, xx, indexing="ij")
+        coords = np.stack([y.ravel(), x.ravel()], -1)
+
+        popt, pcov = curve_fit(
+            PSFAnalysis.ellipsoid2D,
+            coords,
+            data.ravel(),
+            p0=PSFAnalysis.get_estimates_2D(data, spacing),
+        )
+
+        return popt, pcov
+
+    @staticmethod
     def _fwhm(sigma):
         return 2 * np.sqrt(2 * np.log(2)) * sigma
 
@@ -219,25 +293,34 @@ class PSFAnalysis:
         """
         beads, offsets = self._localize_beads(img, points)
         popts, pcovs = [], []
+        popts_2d, pcovs_2d = [], []
         for bead in beads:
             popt, pcov = self._fit_gaussian_3d(bead, self.spacing)
             popts.append(popt)
             pcovs.append(pcov)
+            focus_plane = bead[int(np.round(popt[4] // self.spacing[0]))]
+            popt_2d, pcov_2d = self._fit_gaussian_2d(focus_plane, self.spacing)
+            popts_2d.append(popt_2d)
+            pcovs_2d.append(pcov_2d)
 
         results = self._create_results_table(
             beads,
             popts,
             pcovs,
+            popts_2d,
+            pcovs_2d,
             img_name,
             offsets,
         )
-        return (beads, popts, pcovs, results)
+        return (beads, popts, pcovs, popts_2d, pcovs_2d, results)
 
     def _create_results_table(
         self,
         beads,
         popts,
         pcovs,
+        popts_2d,
+        pcovs_2d,
         img_name,
         offsets,
     ):
@@ -247,17 +330,26 @@ class PSFAnalysis:
         c_mag = []
         c_na = []
         c_amp = []
+        c_amp_2d = []
         c_background = []
+        c_background_2d = []
         c_x = []
         c_y = []
         c_z = []
+        c_x_2d = []
+        c_y_2d = []
         c_fwhm_x = []
         c_fwhm_y = []
         c_fwhm_z = []
+        c_fwhm_2d_x = []
+        c_fwhm_2d_y = []
         c_pa1 = []
         c_pa2 = []
         c_pa3 = []
+        c_pa1_2d = []
+        c_pa2_2d = []
         c_s2bg = []
+        c_s2bg_2d = []
         c_xyspacing = []
         c_zspacing = []
         c_cxx = []
@@ -266,6 +358,9 @@ class PSFAnalysis:
         c_cyy = []
         c_cyz = []
         c_czz = []
+        c_cxx_2d = []
+        c_cxy_2d = []
+        c_cyy_2d = []
         c_sde_peak = []
         c_sde_background = []
         c_sde_mu_x = []
@@ -277,7 +372,17 @@ class PSFAnalysis:
         c_sde_cyy = []
         c_sde_cyz = []
         c_sde_czz = []
-        for popt, pcov, bead, offset in zip(popts, pcovs, beads, offsets):
+        c_sde_peak_2d = []
+        c_sde_background_2d = []
+        c_sde_mu_x_2d = []
+        c_sde_mu_y_2d = []
+        c_sde_cxx_2d = []
+        c_sde_cxy_2d = []
+        c_sde_cyy_2d = []
+        c_version = []
+        for popt, pcov, popt_2d, pcov_2d, bead, offset in zip(
+            popts, pcovs, popts_2d, pcovs_2d, beads, offsets
+        ):
             perr = np.sqrt(np.diag(pcov))
             height = popt[0]
             background = popt[1]
@@ -296,23 +401,47 @@ class PSFAnalysis:
             fwhm_x = self._fwhm(np.sqrt(cxx))
             fwhm_y = self._fwhm(np.sqrt(cyy))
             fwhm_z = self._fwhm(np.sqrt(czz))
+
+            perr_2d = np.sqrt(np.diag(pcov))
+            height_2d = popt_2d[0]
+            background_2d = popt_2d[1]
+            mu_x_2d = popt_2d[2]
+            mu_y_2d = popt_2d[3]
+            cxx_2d = popt_2d[4]
+            cxy_2d = popt_2d[5]
+            cyy_2d = popt_2d[6]
+            cov_2d = np.array([[cxx_2d, cxy_2d], [cxy_2d, cyy_2d]])
+            eigval_2d, eigvec_2d = np.linalg.eig(cov_2d)
+            pa2_2d, pa1_2d = np.sort(np.sqrt(eigval_2d))
+            fwhm_x_2d = self._fwhm(np.sqrt(cxx_2d))
+            fwhm_y_2d = self._fwhm(np.sqrt(cyy_2d))
+
             c_image_name.append(img_name)
             c_date.append(self.date.strftime("%Y-%m-%d"))
             c_microscope.append(self.microscope)
             c_mag.append(self.magnification)
             c_na.append(self.NA)
             c_amp.append(height)
+            c_amp_2d.append(height_2d)
             c_background.append(background)
+            c_background_2d.append(background_2d)
             c_x.append(mu_x + offset[2])
             c_y.append(mu_y + offset[1])
             c_z.append(mu_z + offset[0])
+            c_x_2d.append(mu_x_2d + offset[2])
+            c_y_2d.append(mu_y_2d + offset[1])
             c_fwhm_x.append(fwhm_x)
             c_fwhm_y.append(fwhm_y)
             c_fwhm_z.append(fwhm_z)
+            c_fwhm_2d_x.append(fwhm_x_2d)
+            c_fwhm_2d_y.append(fwhm_y_2d)
             c_pa1.append(self._fwhm(pa1))
             c_pa2.append(self._fwhm(pa2))
             c_pa3.append(self._fwhm(pa3))
+            c_pa1_2d.append(self._fwhm(pa1_2d))
+            c_pa2_2d.append(self._fwhm(pa2_2d))
             c_s2bg.append(height / background)
+            c_s2bg_2d.append(height_2d / background_2d)
             c_xyspacing.append(self.spacing[1])
             c_zspacing.append(self.spacing[0])
             c_cxx.append(cxx)
@@ -321,6 +450,10 @@ class PSFAnalysis:
             c_cyy.append(cyy)
             c_cyz.append(cyz)
             c_czz.append(czz)
+            c_cxx_2d.append(cxx_2d)
+            c_cxy_2d.append(cxy_2d)
+            c_cyy_2d.append(cyy_2d)
+
             c_sde_peak.append(perr[0])
             c_sde_background.append(perr[1])
             c_sde_mu_x.append(perr[2])
@@ -332,6 +465,18 @@ class PSFAnalysis:
             c_sde_cyy.append(perr[8])
             c_sde_cyz.append(perr[9])
             c_sde_czz.append(perr[10])
+
+            c_sde_peak_2d.append(perr_2d[0])
+            c_sde_background_2d.append(perr_2d[1])
+            c_sde_mu_x_2d.append(perr_2d[2])
+            c_sde_mu_y_2d.append(perr_2d[3])
+            c_sde_cxx_2d.append(perr_2d[4])
+            c_sde_cxy_2d.append(perr_2d[5])
+            c_sde_cyy_2d.append(perr_2d[6])
+
+            c_version.append(
+                pkg_resources.get_distribution("napari_psf_analysis").version
+            )
         results = pd.DataFrame(
             {
                 "ImageName": c_image_name,
@@ -340,17 +485,26 @@ class PSFAnalysis:
                 "Magnification": c_mag,
                 "NA": c_na,
                 "Amplitude": c_amp,
+                "Amplitude_2D": c_amp_2d,
                 "Background": c_background,
+                "Background_2D": c_background_2d,
                 "X": c_x,
                 "Y": c_y,
                 "Z": c_z,
+                "X_2D": c_x_2d,
+                "Y_2D": c_y_2d,
                 "FWHM_X": c_fwhm_x,
                 "FWHM_Y": c_fwhm_y,
                 "FWHM_Z": c_fwhm_z,
+                "FWHM_X_2D": c_fwhm_2d_x,
+                "FWHM_Y_2D": c_fwhm_2d_y,
                 "PrincipalAxis_1": c_pa1,
                 "PrincipalAxis_2": c_pa2,
                 "PrincipalAxis_3": c_pa3,
+                "PrincipalAxis_1_2D": c_pa1_2d,
+                "PrincipalAxis_2_2D": c_pa2_2d,
                 "SignalToBG": c_s2bg,
+                "SignalToBG_2D": c_s2bg_2d,
                 "XYpixelsize": c_xyspacing,
                 "Zspacing": c_zspacing,
                 "cov_xx": c_cxx,
@@ -359,6 +513,9 @@ class PSFAnalysis:
                 "cov_yy": c_cyy,
                 "cov_yz": c_cyz,
                 "cov_zz": c_czz,
+                "cov_xx_2D": c_cxx_2d,
+                "cov_xy_2D": c_cxy_2d,
+                "cov_yy_2D": c_cyy_2d,
                 "sde_peak": c_sde_peak,
                 "sde_background": c_sde_background,
                 "sde_X": c_sde_mu_x,
@@ -370,6 +527,14 @@ class PSFAnalysis:
                 "sde_cov_yy": c_sde_cyy,
                 "sde_cov_yz": c_sde_cyz,
                 "sde_cov_zz": c_sde_czz,
+                "sde_peak_2D": c_sde_peak_2d,
+                "sde_background_2D": c_sde_background_2d,
+                "sde_X_2D": c_sde_mu_x_2d,
+                "sde_Y_2D": c_sde_mu_y_2d,
+                "sde_cov_xx_2D": c_sde_cxx_2d,
+                "sde_cov_xy_2D": c_sde_cxy_2d,
+                "sde_cov_yy_2D": c_sde_cyy_2d,
+                "version": c_version,
             }
         )
         return results
