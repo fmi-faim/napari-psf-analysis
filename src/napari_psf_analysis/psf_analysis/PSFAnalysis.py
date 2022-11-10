@@ -99,9 +99,8 @@ class PSFAnalysis:
     def ellipsoid3D(data, A, B, mu_x, mu_y, mu_z, cxx, cxy, cxz, cyy, cyz, czz):
         inv = np.linalg.inv(
             np.array([[cxx, cxy, cxz], [cxy, cyy, cyz], [cxz, cyz, czz]])
-            + np.identity(3) * 1e-8
+            + np.identity(3) * 1e-6
         )
-
         return (
             A
             * np.exp(
@@ -238,6 +237,34 @@ class PSFAnalysis:
             coords,
             data.ravel(),
             p0=PSFAnalysis.get_estimates(data, spacing),
+            bounds=(
+                [
+                    np.mean(data),
+                    0,
+                    0,
+                    0,
+                    0,
+                    -np.inf,
+                    -np.inf,
+                    -np.inf,
+                    -np.inf,
+                    -np.inf,
+                    -np.inf,
+                ],
+                [
+                    np.inf,
+                    data.max(),
+                    data.shape[2] * spacing[2],
+                    data.shape[1] * spacing[1],
+                    data.shape[0] * spacing[0],
+                    np.inf,
+                    np.inf,
+                    np.inf,
+                    np.inf,
+                    np.inf,
+                    np.inf,
+                ],
+            ),
         )
 
         return popt, pcov
@@ -248,12 +275,23 @@ class PSFAnalysis:
         xx = np.arange(data.shape[1]) * spacing[2]
         y, x = np.meshgrid(yy, xx, indexing="ij")
         coords = np.stack([y.ravel(), x.ravel()], -1)
-
         popt, pcov = curve_fit(
             PSFAnalysis.ellipsoid2D,
             coords,
             data.ravel(),
             p0=PSFAnalysis.get_estimates_2D(data, spacing),
+            bounds=(
+                [np.mean(data), 0, 0, 0, -np.inf, -np.inf, -np.inf],
+                [
+                    np.inf,
+                    data.max(),
+                    data.shape[1] * spacing[2],
+                    data.shape[0] * spacing[1],
+                    np.inf,
+                    np.inf,
+                    np.inf,
+                ],
+            ),
         )
 
         return popt, pcov

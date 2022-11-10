@@ -8,6 +8,7 @@ import yaml
 from magicgui import magic_factory
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from napari.settings import get_settings
+from napari.utils.notifications import show_info
 from qtpy.QtWidgets import (
     QComboBox,
     QDateEdit,
@@ -531,6 +532,8 @@ class PsfAnalysis(QWidget):
             ),
             index=False,
         )
+
+        show_info("Saved results.")
 
 
 @magic_factory(

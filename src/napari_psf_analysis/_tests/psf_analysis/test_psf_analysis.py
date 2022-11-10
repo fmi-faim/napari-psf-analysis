@@ -37,9 +37,9 @@ def test_fit_gaussian_3d():
     assert_almost_equal(result[2], x, decimal=7)
     assert_almost_equal(result[3], y, decimal=7)
     assert_almost_equal(result[4], z, decimal=7)
-    assert_almost_equal(np.sqrt(result[5]), sigma_x, decimal=7)
-    assert_almost_equal(np.sqrt(result[8]), sigma_y, decimal=7)
-    assert_almost_equal(np.sqrt(result[10]), sigma_z, decimal=7)
+    assert_almost_equal(np.sqrt(result[5]), sigma_x, decimal=6)
+    assert_almost_equal(np.sqrt(result[8]), sigma_y, decimal=6)
+    assert_almost_equal(np.sqrt(result[10]), sigma_z, decimal=6)
 
 
 def test_fwhm():
@@ -125,9 +125,9 @@ def test_psf_measure():
     assert_almost_equal(result_mu_z, z - offsets[0][0], decimal=7)
     assert_almost_equal(result_mu_y, y - offsets[0][1], decimal=7)
     assert_almost_equal(result_mu_x, x - offsets[0][2], decimal=7)
-    assert_almost_equal(pa1, sigma_z, decimal=7)
-    assert_almost_equal(pa2, sigma_y, decimal=7)
-    assert_almost_equal(pa3, sigma_x, decimal=7)
+    assert_almost_equal(pa1, sigma_z, decimal=6)
+    assert_almost_equal(pa2, sigma_y, decimal=6)
+    assert_almost_equal(pa3, sigma_x, decimal=6)
 
     # This will not be exactly the simulated numbers, because the fit is
     # performed on the int(np.round(mu_z)) bead-plane even if the bead is
@@ -149,9 +149,15 @@ def test_psf_measure():
     assert_almost_equal(results["Z"][0], z)
     assert_almost_equal(results["X_2D"][0], x)
     assert_almost_equal(results["Y_2D"][0], y)
-    assert_almost_equal(results["FWHM_X"][0], sigma_x * 2 * np.sqrt(2 * np.log(2)))
-    assert_almost_equal(results["FWHM_Y"][0], sigma_y * 2 * np.sqrt(2 * np.log(2)))
-    assert_almost_equal(results["FWHM_Z"][0], sigma_z * 2 * np.sqrt(2 * np.log(2)))
+    assert_almost_equal(
+        results["FWHM_X"][0], sigma_x * 2 * np.sqrt(2 * np.log(2)), decimal=6
+    )
+    assert_almost_equal(
+        results["FWHM_Y"][0], sigma_y * 2 * np.sqrt(2 * np.log(2)), decimal=6
+    )
+    assert_almost_equal(
+        results["FWHM_Z"][0], sigma_z * 2 * np.sqrt(2 * np.log(2)), decimal=6
+    )
     fwhm_x = sigma_x * 2 * np.sqrt(2 * np.log(2))
     assert_almost_equal(results["FWHM_X_2D"][0], fwhm_x)
     fwhm_y = sigma_y * 2 * np.sqrt(2 * np.log(2))
