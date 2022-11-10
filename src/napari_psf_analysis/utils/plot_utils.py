@@ -95,7 +95,7 @@ def create_psf_overview(
 
     cx = mu_x / xy_spacing + 0.5
     cy = mu_y / xy_spacing + 0.5
-    cz = (mu_z + z_spacing) / xy_spacing + 0.5
+    cz = (mu_z + z_spacing * 0.5) / xy_spacing + 0.5
 
     ax_xy.imshow(
         np.sqrt(np.max(bead, axis=0)),
