@@ -326,6 +326,7 @@ class PSFAnalysis:
 
         popt[2] += crop_xy * spacing[2]
         popt[3] += crop_xy * spacing[1]
+
         return popt, pcov
 
     @staticmethod
@@ -364,25 +365,40 @@ class PSFAnalysis:
         beads, offsets = self._localize_beads(img, points)
         popts, pcovs = [], []
         popts_2d, pcovs_2d = [], []
-        for bead in beads:
-            popt, pcov = self._fit_gaussian_3d(bead, self.spacing)
-            popts.append(popt)
-            pcovs.append(pcov)
-            focus_plane = bead[int(np.round(popt[4] // self.spacing[0]))]
-            popt_2d, pcov_2d = self._fit_gaussian_2d(focus_plane, self.spacing)
-            popts_2d.append(popt_2d)
-            pcovs_2d.append(pcov_2d)
+        fitted_beads, fitted_offsets = [], []
+        for bead, offset in zip(beads, offsets):
+            try:
+                popt, pcov = self._fit_gaussian_3d(bead, self.spacing)
+                focus_plane = bead[int(np.round(popt[4] // self.spacing[0]))]
+                popt_2d, pcov_2d = self._fit_gaussian_2d(focus_plane, self.spacing)
+
+                popts.append(popt)
+                pcovs.append(pcov)
+                popts_2d.append(popt_2d)
+                pcovs_2d.append(pcov_2d)
+                fitted_beads.append(bead)
+                fitted_offsets.append(offset)
+            except RuntimeError as e:
+                if "Optimal parameters not found:" in str(e):
+                    z_pos = offset[0] + bead.shape[0] // 2
+                    y_pos = offset[1] + bead.shape[1] // 2
+                    x_pos = offset[2] + bead.shape[2] // 2
+                    show_info(
+                        f"No fit found at position ({z_pos}, {y_pos},"
+                        f" {x_pos}). Discarding point."
+                    )
+                    continue
 
         results = self._create_results_table(
-            beads,
+            fitted_beads,
             popts,
             pcovs,
             popts_2d,
             pcovs_2d,
             img_name,
-            offsets,
+            fitted_offsets,
         )
-        return (beads, popts, pcovs, popts_2d, pcovs_2d, results)
+        return (fitted_beads, popts, pcovs, popts_2d, pcovs_2d, results)
 
     def _create_results_table(
         self,
