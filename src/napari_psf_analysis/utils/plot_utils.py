@@ -1,6 +1,7 @@
 import numpy
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib_inline.backend_inline import FigureCanvas
 
 
 def get_parameters(popt):
@@ -540,4 +541,12 @@ def create_psf_overview(
 
     ax_text.plot([0, 0, 100, 100, 0], [0, 100, 100, 0, 0], color="black")
 
-    return fig
+    canvas = FigureCanvas(fig)
+    canvas.draw()  # draw the canvas, cache the renderer
+
+    image = np.frombuffer(canvas.tostring_rgb(), dtype="uint8").reshape(
+        (fig.canvas.get_width_height()[::-1]) + (3,)
+    )
+
+    plt.close(fig)
+    return image

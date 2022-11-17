@@ -6,7 +6,8 @@ import napari.layers
 import numpy as np
 import yaml
 from magicgui import magic_factory
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from napari import viewer
+from napari._qt.qthreading import FunctionWorker, thread_worker
 from napari.settings import get_settings
 from napari.utils.notifications import show_info
 from qtpy.QtWidgets import (
@@ -75,7 +76,7 @@ def layer_widget(layer: napari.layers.Image):
 class PsfAnalysis(QWidget):
     def __init__(self, napari_viewer, parent=None):
         super().__init__(parent=parent)
-        self._viewer = napari_viewer
+        self._viewer: viewer = napari_viewer
         napari_viewer.layers.events.inserted.connect(self._layer_inserted)
         napari_viewer.layers.events.removed.connect(self._layer_removed)
         napari_viewer.layers.selection.events.changed.connect(self._on_selection)
@@ -242,7 +243,7 @@ class PsfAnalysis(QWidget):
         self.layout().addWidget(setting_tabs)
 
         self.extract_psfs = QPushButton("Extract PSFs")
-        self.extract_psfs.clicked.connect(self.measure)
+        self.extract_psfs.clicked.connect(lambda: self.prepare_measure())
         self.layout().addWidget(self.extract_psfs)
 
         self.delete_measurement = QPushButton("Delete Displayed Measurement")
@@ -326,32 +327,18 @@ class PsfAnalysis(QWidget):
                 self._viewer.layers.selection.active.name == "Analyzed Beads"
             )
 
-    def measure(self):
+    def prepare_measure(self):
         if isinstance(self.microscope, QComboBox):
             microscope = self.microscope.currentText()
         else:
             microscope = self.microscope.text()
 
-        m = PSFAnalysis(
-            date=datetime(*self.date.date().getDate()),
-            microscope=microscope,
-            magnification=self.magnification.value(),
-            NA=self.na.value(),
-            spacing=np.array(
-                [
-                    self.z_spacing.value(),
-                    self.xy_pixelsize.value(),
-                    self.xy_pixelsize.value(),
-                ]
-            ),
-            patch_size=np.array(
-                [
-                    self.psf_box_size.value(),
-                ]
-                * 3
-            ),
-        )
-
+        date = self.date.date().getDate()
+        magnification = self.magnification.value()
+        na = self.na.value()
+        z_spacing = self.z_spacing.value()
+        xy_pixelsize = self.xy_pixelsize.value()
+        psf_box_size = self.psf_box_size.value()
         img_layer = None
         for layer in self._viewer.layers:
             if str(layer) == self.cbox_img.currentText():
@@ -375,11 +362,79 @@ class PsfAnalysis(QWidget):
         from bfio.bfio import NapariReader
 
         if isinstance(img_layer.data, NapariReader):
-            img_data = np.transpose(img_layer.data.br.read(), [2, 0, 1])
+            img_data = np.transpose(img_layer.data.br.read(), [2, 0, 1]).copy()
         else:
-            img_data = img_layer.data
+            img_data = img_layer.data.copy()
 
-        point_data = point_layer.data
+        point_data = point_layer.data.copy()
+        name = basename(img_layer.source.path)
+
+        def _on_done(result):
+            measurement_stack, measurement_scale = result
+            self._viewer.add_image(
+                measurement_stack,
+                name="Analyzed Beads",
+                interpolation="bicubic",
+                rgb=True,
+                scale=measurement_scale,
+            )
+            self._viewer.dims.set_point(0, 0)
+            self._viewer.reset_view()
+            self.setEnabled(True)
+
+        worker: FunctionWorker = self.measure(
+            date,
+            microscope,
+            magnification,
+            na,
+            z_spacing,
+            xy_pixelsize,
+            psf_box_size,
+            name,
+            img_data,
+            point_data,
+        )
+
+        worker.returned.connect(_on_done)
+        worker.start()
+
+        self.setEnabled(False)
+
+    @thread_worker(progress={"total": 0})
+    def measure(
+        self,
+        date,
+        microscope,
+        magnification,
+        na,
+        z_spacing,
+        xy_pixelsize,
+        psf_box_size,
+        name,
+        img_data,
+        point_data,
+    ):
+
+        m = PSFAnalysis(
+            date=datetime(*date),
+            microscope=microscope,
+            magnification=magnification,
+            NA=na,
+            spacing=np.array(
+                [
+                    z_spacing,
+                    xy_pixelsize,
+                    xy_pixelsize,
+                ]
+            ),
+            patch_size=np.array(
+                [
+                    psf_box_size,
+                ]
+                * 3
+            ),
+        )
+
         (
             beads,
             fitted_params,
@@ -387,7 +442,7 @@ class PsfAnalysis(QWidget):
             fitted_params_2d,
             _,
             self.results,
-        ) = m.analyze(basename(img_layer.source.path), img_data, point_data)
+        ) = m.analyze(name, img_data, point_data)
 
         self.bead_imgs = {}
         for i in range(len(beads)):
@@ -407,7 +462,7 @@ class PsfAnalysis(QWidget):
             fwhm_y_2d = entry["FWHM_Y_2D"]
             version = entry["version"]
 
-            fig = create_psf_overview(
+            image = create_psf_overview(
                 bead,
                 params,
                 vmin,
@@ -421,12 +476,6 @@ class PsfAnalysis(QWidget):
                 self.z_spacing.value(),
                 datetime(*self.date.date().getDate()).strftime("%Y-%m-%d"),
                 version,
-            )
-            canvas = FigureCanvas(fig)
-            canvas.draw()  # draw the canvas, cache the renderer
-
-            image = np.frombuffer(canvas.tostring_rgb(), dtype="uint8").reshape(
-                (fig.canvas.get_width_height()[::-1]) + (3,)
             )
 
             centroid = np.round([entry["X"], entry["Y"], entry["Z"]], 1)
@@ -447,15 +496,7 @@ class PsfAnalysis(QWidget):
                     bead_scale[1] / measurement_stack.shape[1] * bead_shape[1],
                 ]
             )
-            self._viewer.add_image(
-                measurement_stack,
-                name="Analyzed Beads",
-                interpolation="bicubic",
-                rgb=True,
-                scale=measurement_scale,
-            )
-            self._viewer.dims.set_point(0, 0)
-            self._viewer.reset_view()
+            return measurement_stack, measurement_scale
 
     def delete_measurements(self):
         idx = self._viewer.dims.current_step[0]
