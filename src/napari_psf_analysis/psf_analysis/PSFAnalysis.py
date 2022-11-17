@@ -57,7 +57,6 @@ class PSFAnalysis:
         offsets = []
         margins = self.patch_size / self.spacing / 2
         for p in points:
-
             if np.all(p > margins) and np.all(p < (np.array(img.shape) - margins)):
                 z_search_slice = self._create_slice(p[0], margins[0])
                 y_search_slice = self._create_slice(p[1], margins[1])
@@ -81,9 +80,22 @@ class PSFAnalysis:
                     closest_roi[2] + x_search_slice.start, margins[2]
                 )
 
-                bead = img[z_slice, y_slice, x_slice]
-                offsets.append(tuple([z_slice.start, y_slice.start, x_slice.start]))
-                beads.append(bead)
+                out_z = (z_slice.start < 0) or (z_slice.stop >= img.shape[0])
+                out_y = (y_slice.start < 0) or (y_slice.stop >= img.shape[1])
+                out_x = (x_slice.start < 0) or (x_slice.stop >= img.shape[2])
+
+                if out_z or out_y or out_x:
+                    show_info(
+                        "Discarded point ({}, {}, {}). Too close to image border.".format(
+                            np.round(p[2]),
+                            np.round(p[1]),
+                            np.round(p[0]),
+                        )
+                    )
+                else:
+                    bead = img[z_slice, y_slice, x_slice]
+                    offsets.append(tuple([z_slice.start, y_slice.start, x_slice.start]))
+                    beads.append(bead)
             else:
                 show_info(
                     "Discarded point ({}, {}, {}). Too close to image border.".format(
@@ -226,20 +238,27 @@ class PSFAnalysis:
 
     @staticmethod
     def _fit_gaussian_3d(data, spacing):
-        zz = np.arange(data.shape[0]) * spacing[0]
-        yy = np.arange(data.shape[1]) * spacing[1]
-        xx = np.arange(data.shape[2]) * spacing[2]
+
+        crop_xy = max(0, int((data.shape[1] - (3000 / spacing[1])) // 2))
+        if crop_xy > 0:
+            data_cropped = data[:, crop_xy:-crop_xy, crop_xy:-crop_xy]
+        else:
+            data_cropped = data
+
+        zz = np.arange(data_cropped.shape[0]) * spacing[0]
+        yy = np.arange(data_cropped.shape[1]) * spacing[1]
+        xx = np.arange(data_cropped.shape[2]) * spacing[2]
         z, y, x = np.meshgrid(zz, yy, xx, indexing="ij")
         coords = np.stack([z.ravel(), y.ravel(), x.ravel()], -1)
 
         popt, pcov = curve_fit(
             PSFAnalysis.ellipsoid3D,
             coords,
-            data.ravel(),
-            p0=PSFAnalysis.get_estimates(data, spacing),
+            data_cropped.ravel(),
+            p0=PSFAnalysis.get_estimates(data_cropped, spacing),
             bounds=(
                 [
-                    np.mean(data),
+                    np.mean(data_cropped),
                     0,
                     0,
                     0,
@@ -267,19 +286,30 @@ class PSFAnalysis:
             ),
         )
 
+        popt[2] += crop_xy * spacing[2]
+        popt[3] += crop_xy * spacing[1]
+
         return popt, pcov
 
     @staticmethod
     def _fit_gaussian_2d(data, spacing):
-        yy = np.arange(data.shape[0]) * spacing[1]
-        xx = np.arange(data.shape[1]) * spacing[2]
+
+        crop_xy = max(0, int((data.shape[0] - (3000 / spacing[1])) // 2))
+
+        if crop_xy > 0:
+            data_cropped = data[crop_xy:-crop_xy, crop_xy:-crop_xy]
+        else:
+            data_cropped = data
+
+        yy = np.arange(data_cropped.shape[0]) * spacing[1]
+        xx = np.arange(data_cropped.shape[1]) * spacing[2]
         y, x = np.meshgrid(yy, xx, indexing="ij")
         coords = np.stack([y.ravel(), x.ravel()], -1)
         popt, pcov = curve_fit(
             PSFAnalysis.ellipsoid2D,
             coords,
-            data.ravel(),
-            p0=PSFAnalysis.get_estimates_2D(data, spacing),
+            data_cropped.ravel(),
+            p0=PSFAnalysis.get_estimates_2D(data_cropped, spacing),
             bounds=(
                 [np.mean(data), 0, 0, 0, -np.inf, -np.inf, -np.inf],
                 [
@@ -293,6 +323,9 @@ class PSFAnalysis:
                 ],
             ),
         )
+
+        popt[2] += crop_xy * spacing[2]
+        popt[3] += crop_xy * spacing[1]
 
         return popt, pcov
 
@@ -332,25 +365,40 @@ class PSFAnalysis:
         beads, offsets = self._localize_beads(img, points)
         popts, pcovs = [], []
         popts_2d, pcovs_2d = [], []
-        for bead in beads:
-            popt, pcov = self._fit_gaussian_3d(bead, self.spacing)
-            popts.append(popt)
-            pcovs.append(pcov)
-            focus_plane = bead[int(np.round(popt[4] // self.spacing[0]))]
-            popt_2d, pcov_2d = self._fit_gaussian_2d(focus_plane, self.spacing)
-            popts_2d.append(popt_2d)
-            pcovs_2d.append(pcov_2d)
+        fitted_beads, fitted_offsets = [], []
+        for bead, offset in zip(beads, offsets):
+            try:
+                popt, pcov = self._fit_gaussian_3d(bead, self.spacing)
+                focus_plane = bead[int(np.round(popt[4] // self.spacing[0]))]
+                popt_2d, pcov_2d = self._fit_gaussian_2d(focus_plane, self.spacing)
+
+                popts.append(popt)
+                pcovs.append(pcov)
+                popts_2d.append(popt_2d)
+                pcovs_2d.append(pcov_2d)
+                fitted_beads.append(bead)
+                fitted_offsets.append(offset)
+            except RuntimeError as e:
+                if "Optimal parameters not found:" in str(e):
+                    z_pos = offset[0] + bead.shape[0] // 2
+                    y_pos = offset[1] + bead.shape[1] // 2
+                    x_pos = offset[2] + bead.shape[2] // 2
+                    show_info(
+                        f"No fit found at position ({z_pos}, {y_pos},"
+                        f" {x_pos}). Discarding point."
+                    )
+                    continue
 
         results = self._create_results_table(
-            beads,
+            fitted_beads,
             popts,
             pcovs,
             popts_2d,
             pcovs_2d,
             img_name,
-            offsets,
+            fitted_offsets,
         )
-        return (beads, popts, pcovs, popts_2d, pcovs_2d, results)
+        return (fitted_beads, popts, pcovs, popts_2d, pcovs_2d, results)
 
     def _create_results_table(
         self,
