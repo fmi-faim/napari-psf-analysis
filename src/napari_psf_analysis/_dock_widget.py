@@ -370,16 +370,17 @@ class PsfAnalysis(QWidget):
         name = basename(img_layer.source.path)
 
         def _on_done(result):
-            measurement_stack, measurement_scale = result
-            self._viewer.add_image(
-                measurement_stack,
-                name="Analyzed Beads",
-                interpolation="bicubic",
-                rgb=True,
-                scale=measurement_scale,
-            )
-            self._viewer.dims.set_point(0, 0)
-            self._viewer.reset_view()
+            if result is not None:
+                measurement_stack, measurement_scale = result
+                self._viewer.add_image(
+                    measurement_stack,
+                    name="Analyzed Beads",
+                    interpolation="bicubic",
+                    rgb=True,
+                    scale=measurement_scale,
+                )
+                self._viewer.dims.set_point(0, 0)
+                self._viewer.reset_view()
             self.setEnabled(True)
 
         worker: FunctionWorker = self.measure(
