@@ -1,5 +1,8 @@
+from os.path import basename
+
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib_scalebar.scalebar import ScaleBar
 from scipy.optimize import minimize
 from scipy.special import kl_div
 from skimage.measure import centroid
@@ -297,3 +300,330 @@ def get_ellipsoid(cov, spacing):
 
     x, y, z = (cov @ np.stack((x, y, z), 0).reshape(3, -1) + bias).reshape(3, *x.shape)
     return x / spacing[2], y / spacing[1], z / spacing[0]
+
+
+def plot_1d_fits(
+    name,
+    psf_x,
+    coords_x,
+    fine_coords_x,
+    amp,
+    bg,
+    mu,
+    sigma,
+    popt,
+    res,
+    est_fwhm_x,
+    cv_fwhm_x,
+    kld_fwhm_x,
+    y_lim,
+):
+    plt.figure(figsize=(15, 5))
+    plt.bar(coords_x, psf_x, width=10, color="k", zorder=10)
+    plt.plot(
+        fine_coords_x,
+        gauss_1d(amp, bg, mu[0], sigma)(fine_coords_x),
+        "--",
+        label="Estimated",
+        color="b",
+    )
+    plt.plot(
+        [mu[0] - est_fwhm_x / 2, mu[0] + est_fwhm_x / 2],
+        [
+            bg + amp / 2,
+        ]
+        * 2,
+        "--",
+        color="b",
+    )
+    plt.plot(
+        fine_coords_x,
+        gauss_1d(*popt)(fine_coords_x),
+        "--",
+        label="Curve fit [lstsq]",
+        color="r",
+    )
+    plt.plot(
+        [popt[2] - cv_fwhm_x / 2, popt[2] + cv_fwhm_x / 2],
+        [
+            popt[1] + popt[0] / 2,
+        ]
+        * 2,
+        "--",
+        color="r",
+    )
+    plt.plot(
+        fine_coords_x,
+        gauss_1d(*res.x)(fine_coords_x),
+        "--",
+        label="Minimize KL-Div",
+        color="g",
+    )
+    plt.plot(
+        [res.x[2] - kld_fwhm_x / 2, res.x[2] + kld_fwhm_x / 2],
+        [
+            res.x[1] + res.x[0] / 2,
+        ]
+        * 2,
+        "--",
+        color="g",
+    )
+    plt.ylim(y_lim)
+    plt.legend()
+    plt.savefig(f"{name}.png", bbox_inches="tight")
+
+
+def plot_3d_fits(
+    file,
+    psf,
+    spacing,
+    params,
+    popt,
+    res,
+    base_z_contours,
+    cv_z_contours,
+    kl_z_contours,
+    base_y_contours,
+    cv_y_contours,
+    kl_y_contours,
+    base_x_contours,
+    cv_x_contours,
+    kl_x_contours,
+):
+    xy_spacing = spacing[1]
+    extent = [0, psf.shape[1], 0, psf.shape[2]]
+    vmin, vmax = np.quantile(np.sqrt(np.max(psf, axis=0)), 0.03), np.quantile(
+        np.sqrt(np.max(psf, axis=0)), 1
+    )
+
+    fig = plt.figure(figsize=(10, 10))
+
+    ax_xy = fig.add_axes([0.025, 0.525, 0.45, 0.45])
+    ax_yz = fig.add_axes([0.525, 0.525, 0.45, 0.45])
+    ax_zx = fig.add_axes([0.025, 0.025, 0.45, 0.45])
+
+    ax_X = fig.add_axes([0.24, 0.49, 0.02, 0.02])
+    ax_X.text(0.5, 0.5, "X", fontsize=14, ha="center", va="center")
+    ax_X.axis("off")
+    ax_Y = fig.add_axes([0.49, 0.74, 0.02, 0.02])
+    ax_Y.text(0.5, 0.5, "Y", fontsize=14, ha="center", va="center")
+    ax_Y.axis("off")
+    ax_Z = fig.add_axes([0.477, 0.24, 0.02, 0.02])
+    ax_Z.text(0.5, 0.5, "Z", fontsize=14, ha="center", va="center")
+    ax_Z.axis("off")
+    ax_Z1 = fig.add_axes([0.73, 0.50, 0.02, 0.02])
+    ax_Z1.text(0.5, 0.5, "Z", fontsize=14, ha="center", va="center")
+    ax_Z1.axis("off")
+
+    scalebar = ScaleBar(xy_spacing, "nm", fixed_value=500, location="lower " "right")
+    ax_xy.add_artist(scalebar)
+    ax_xy.set_xticks([])
+    ax_xy.set_yticks([])
+    ax_xy.imshow(
+        np.sqrt(np.max(psf, axis=0)),
+        cmap="turbo",
+        vmin=vmin,
+        vmax=vmax,
+        extent=extent,
+        interpolation="nearest",
+        origin="lower",
+    )
+    ax_xy.plot(
+        base_z_contours[:, 1] + 0.5,
+        base_z_contours[:, 0] + 0.5,
+        "-",
+        color="white",
+        linewidth=3,
+    )
+    ax_xy.plot(
+        cv_z_contours[:, 1] + 0.5,
+        cv_z_contours[:, 0] + 0.5,
+        "-",
+        color="white",
+        linewidth=3,
+    )
+    ax_xy.plot(
+        kl_z_contours[:, 1] + 0.5,
+        kl_z_contours[:, 0] + 0.5,
+        "-",
+        color="white",
+        linewidth=3,
+    )
+    ax_xy.plot(
+        base_z_contours[:, 1] + 0.5,
+        base_z_contours[:, 0] + 0.5,
+        ":",
+        color="black",
+        linewidth=3,
+    )
+    ax_xy.plot(
+        cv_z_contours[:, 1] + 0.5,
+        cv_z_contours[:, 0] + 0.5,
+        ":",
+        color="c",
+        linewidth=3,
+    )
+    ax_xy.plot(
+        kl_z_contours[:, 1] + 0.5,
+        kl_z_contours[:, 0] + 0.5,
+        ":",
+        color="m",
+        linewidth=3,
+    )
+
+    ax_zx.set_xticks([])
+    ax_zx.set_yticks([])
+    ax_zx.imshow(
+        np.sqrt(np.max(psf, axis=1)),
+        cmap="turbo",
+        vmin=vmin,
+        vmax=vmax,
+        extent=extent,
+        interpolation="nearest",
+        origin="lower",
+    )
+    ax_zx.plot(
+        base_y_contours[:, 1] + 0.5,
+        base_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+        "-",
+        color="white",
+        linewidth=3,
+    )
+    ax_zx.plot(
+        cv_y_contours[:, 1] + 0.5,
+        cv_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+        "-",
+        color="white",
+        linewidth=3,
+    )
+    ax_zx.plot(
+        kl_y_contours[:, 1] + 0.5,
+        kl_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+        "-",
+        color="white",
+        linewidth=3,
+    )
+    ax_zx.plot(
+        base_y_contours[:, 1] + 0.5,
+        base_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+        ":",
+        color="black",
+        linewidth=3,
+    )
+    ax_zx.plot(
+        cv_y_contours[:, 1] + 0.5,
+        cv_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+        ":",
+        color="c",
+        linewidth=3,
+    )
+    ax_zx.plot(
+        kl_y_contours[:, 1] + 0.5,
+        kl_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+        ":",
+        color="m",
+        linewidth=3,
+    )
+
+    ax_yz.set_xticks([])
+    ax_yz.set_yticks([])
+    ax_yz.imshow(
+        np.sqrt(np.max(psf, axis=2)).T,
+        cmap="turbo",
+        vmin=vmin,
+        vmax=vmax,
+        extent=extent,
+        interpolation="nearest",
+        origin="lower",
+    )
+    ax_yz.plot(
+        base_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+        base_x_contours[:, 1] + 0.5,
+        "-",
+        color="white",
+        linewidth=3,
+    )
+    ax_yz.plot(
+        cv_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+        cv_x_contours[:, 1] + 0.5,
+        "-",
+        color="white",
+        linewidth=3,
+    )
+    ax_yz.plot(
+        kl_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+        kl_x_contours[:, 1] + 0.5,
+        "-",
+        color="white",
+        linewidth=3,
+    )
+    ax_yz.plot(
+        base_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+        base_x_contours[:, 1] + 0.5,
+        ":",
+        color="black",
+        linewidth=3,
+    )
+    ax_yz.plot(
+        cv_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+        cv_x_contours[:, 1] + 0.5,
+        ":",
+        color="c",
+        linewidth=3,
+    )
+    ax_yz.plot(
+        kl_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+        kl_x_contours[:, 1] + 0.5,
+        ":",
+        color="m",
+        linewidth=3,
+    )
+
+    ax_3D = fig.add_axes(
+        [0.525, 0.025, 0.45, 0.45], projection="3d", computed_zorder=True
+    )
+
+    base_ell = get_ellipsoid(
+        [[params[5], 0, 0], [0, params[8], 0], [0, 0, params[10]]], spacing
+    )
+    ax_3D.plot_surface(
+        *base_ell, rstride=2, cstride=2, color="black", antialiased=True, alpha=0.5
+    )
+    ax_3D.plot_wireframe(
+        *base_ell, rstride=2, cstride=2, color="black", antialiased=True, alpha=0.5
+    )
+
+    cv_ell = get_ellipsoid(
+        [
+            [popt[5], popt[6], popt[7]],
+            [popt[6], popt[8], popt[9]],
+            [popt[7], popt[9], popt[10]],
+        ],
+        spacing,
+    )
+    ax_3D.plot_surface(
+        *cv_ell, rstride=1, cstride=1, color="c", antialiased=True, alpha=0.25
+    )
+    ax_3D.plot_wireframe(
+        *cv_ell, rstride=2, cstride=2, color="c", antialiased=True, alpha=0.5
+    )
+
+    kl_ell = get_ellipsoid(
+        [
+            [res.x[5], res.x[6], res.x[7]],
+            [res.x[6], res.x[8], res.x[9]],
+            [res.x[7], res.x[9], res.x[10]],
+        ],
+        spacing,
+    )
+    ax_3D.plot_wireframe(
+        *kl_ell, rstride=2, cstride=2, color="m", antialiased=True, alpha=0.5
+    )
+
+    bbox_min = np.min([*kl_ell])
+    bbox_max = np.max([*kl_ell])
+    ax_3D.auto_scale_xyz(
+        [bbox_min, bbox_max], [bbox_min, bbox_max], [bbox_min, bbox_max]
+    )
+
+    fig.savefig(f"{basename(file)}.png", bbox_inches="tight")
