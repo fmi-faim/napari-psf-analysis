@@ -99,7 +99,7 @@ def main():
         results["kldiv_1d_fwhm_x"].append(kld_fwhm_x)
         fine_coords_x = np.linspace(coords_x[0], coords_x[-1], 500)
         plot_1d_fits(
-            basename(file_name) + "-1D-X.png",
+            basename(file_name) + "-1D-X",
             psf_x,
             coords_x,
             fine_coords_x,
@@ -143,7 +143,7 @@ def main():
         results["kldiv_1d_fwhm_y"].append(kld_fwhm_y)
         fine_coords_y = np.linspace(coords_y[0], coords_y[-1], 500)
         plot_1d_fits(
-            basename(file_name) + "-1D-Y.png",
+            basename(file_name) + "-1D-Y",
             psf_y,
             coords_y,
             fine_coords_y,
@@ -187,7 +187,7 @@ def main():
         results["kldiv_1d_fwhm_z"].append(kld_fwhm_z)
         fine_coords_z = np.linspace(coords_z[0], coords_z[-1], 500)
         plot_1d_fits(
-            basename(file_name) + "-1D-Z.png",
+            basename(file_name) + "-1D-Z",
             psf_z,
             coords_z,
             fine_coords_z,
