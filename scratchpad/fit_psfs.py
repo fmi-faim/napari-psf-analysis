@@ -27,9 +27,11 @@ from tifffile import imread
 def main():
 
     files = [
-        ["W1_Levi_40x_1_Conf488.stk", [200, 163, 163]],
-        ["20221114_PSF_Stellaris5_60X_1.tif", [200, 36, 36]],
-        ["W1_Levi_63x_1_Conf488.stk", [200, 103, 103]],
+        [
+            "/tungstenfs/scratch/gmicro/buchtimo/laurent_todelete"
+            "/100x_5ms_laser12pc_1_Conf488_t3.stk",
+            [100, 65, 65],
+        ]
     ]
 
     results = {
@@ -397,43 +399,73 @@ def main():
         ]
         base_z_contours = base_z_contours / 500 * psf.shape[1]
 
-        cv2d_z_contours = find_contours(
-            cv2d_z_plane, level=cv_2d_params[0] / 2 + cv_2d_params[1]
-        )[0]
-        cv2d_z_contours = cv2d_z_contours / 500 * psf.shape[1]
+        try:
+            cv2d_z_contours = find_contours(
+                cv2d_z_plane, level=cv_2d_params[0] / 2 + cv_2d_params[1]
+            )[0]
+            cv2d_z_contours = cv2d_z_contours / 500 * psf.shape[1]
+        except IndexError:
+            cv2d_z_contours = None
 
-        kl2d_z_contours = find_contours(
-            kl2d_z_plane, level=kl_2d_params[0] / 2 + kl_2d_params[1]
-        )[0]
-        kl2d_z_contours = kl2d_z_contours / 500 * psf.shape[1]
+        try:
+            kl2d_z_contours = find_contours(
+                kl2d_z_plane, level=kl_2d_params[0] / 2 + kl_2d_params[1]
+            )[0]
+            kl2d_z_contours = kl2d_z_contours / 500 * psf.shape[1]
+        except IndexError:
+            kl2d_z_contours = None
 
-        base_y_contours = find_contours(base_y_plane, level=params[0] / 2 + params[1])[
-            0
-        ]
-        base_y_contours = base_y_contours / 500 * psf.shape[1]
+        try:
+            base_y_contours = find_contours(
+                base_y_plane, level=params[0] / 2 + params[1]
+            )[0]
+            base_y_contours = base_y_contours / 500 * psf.shape[1]
+        except IndexError:
+            base_y_contours = None
 
-        base_x_contours = find_contours(base_x_plane, level=params[0] / 2 + params[1])[
-            0
-        ]
-        base_x_contours = base_x_contours / 500 * psf.shape[1]
+        try:
+            base_x_contours = find_contours(
+                base_x_plane, level=params[0] / 2 + params[1]
+            )[0]
+            base_x_contours = base_x_contours / 500 * psf.shape[1]
+        except IndexError:
+            base_x_contours = None
 
-        cv_z_contours = find_contours(cv_z_plane, level=popt[0] / 2 + popt[1])[0]
-        cv_z_contours = cv_z_contours / 500 * psf.shape[1]
+        try:
+            cv_z_contours = find_contours(cv_z_plane, level=popt[0] / 2 + popt[1])[0]
+            cv_z_contours = cv_z_contours / 500 * psf.shape[1]
+        except IndexError:
+            cv_z_contours = None
 
-        cv_y_contours = find_contours(cv_y_plane, level=popt[0] / 2 + popt[1])[0]
-        cv_y_contours = cv_y_contours / 500 * psf.shape[1]
+        try:
+            cv_y_contours = find_contours(cv_y_plane, level=popt[0] / 2 + popt[1])[0]
+            cv_y_contours = cv_y_contours / 500 * psf.shape[1]
+        except IndexError:
+            cv_y_contours = None
 
-        cv_x_contours = find_contours(cv_x_plane, level=popt[0] / 2 + popt[1])[0]
-        cv_x_contours = cv_x_contours / 500 * psf.shape[1]
+        try:
+            cv_x_contours = find_contours(cv_x_plane, level=popt[0] / 2 + popt[1])[0]
+            cv_x_contours = cv_x_contours / 500 * psf.shape[1]
+        except IndexError:
+            cv_x_contours = None
 
-        kl_z_contours = find_contours(kl_z_plane, level=res.x[0] / 2 + res.x[1])[0]
-        kl_z_contours = kl_z_contours / 500 * psf.shape[1]
+        try:
+            kl_z_contours = find_contours(kl_z_plane, level=res.x[0] / 2 + res.x[1])[0]
+            kl_z_contours = kl_z_contours / 500 * psf.shape[1]
+        except IndexError:
+            kl_z_contours = None
 
-        kl_y_contours = find_contours(kl_y_plane, level=res.x[0] / 2 + res.x[1])[0]
-        kl_y_contours = kl_y_contours / 500 * psf.shape[1]
+        try:
+            kl_y_contours = find_contours(kl_y_plane, level=res.x[0] / 2 + res.x[1])[0]
+            kl_y_contours = kl_y_contours / 500 * psf.shape[1]
+        except IndexError:
+            kl_y_contours = None
 
-        kl_x_contours = find_contours(kl_x_plane, level=res.x[0] / 2 + res.x[1])[0]
-        kl_x_contours = kl_x_contours / 500 * psf.shape[1]
+        try:
+            kl_x_contours = find_contours(kl_x_plane, level=res.x[0] / 2 + res.x[1])[0]
+            kl_x_contours = kl_x_contours / 500 * psf.shape[1]
+        except IndexError:
+            kl_x_contours = None
 
         plot_3d_fits(
             file_name,

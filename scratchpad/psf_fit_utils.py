@@ -428,48 +428,58 @@ def plot_3d_fits(
         interpolation="nearest",
         origin="lower",
     )
-    ax_xy.plot(
-        base_z_contours[:, 1] + 0.5,
-        base_z_contours[:, 0] + 0.5,
-        "-",
-        color="white",
-        linewidth=3,
-    )
-    ax_xy.plot(
-        cv_z_contours[:, 1] + 0.5,
-        cv_z_contours[:, 0] + 0.5,
-        "-",
-        color="white",
-        linewidth=3,
-    )
-    ax_xy.plot(
-        kl_z_contours[:, 1] + 0.5,
-        kl_z_contours[:, 0] + 0.5,
-        "-",
-        color="white",
-        linewidth=3,
-    )
-    ax_xy.plot(
-        base_z_contours[:, 1] + 0.5,
-        base_z_contours[:, 0] + 0.5,
-        ":",
-        color="black",
-        linewidth=3,
-    )
-    ax_xy.plot(
-        cv_z_contours[:, 1] + 0.5,
-        cv_z_contours[:, 0] + 0.5,
-        ":",
-        color="c",
-        linewidth=3,
-    )
-    ax_xy.plot(
-        kl_z_contours[:, 1] + 0.5,
-        kl_z_contours[:, 0] + 0.5,
-        ":",
-        color="m",
-        linewidth=3,
-    )
+    if base_z_contours is not None:
+        ax_xy.plot(
+            base_z_contours[:, 1] + 0.5,
+            base_z_contours[:, 0] + 0.5,
+            "-",
+            color="white",
+            linewidth=3,
+        )
+    if cv_z_contours is not None:
+        ax_xy.plot(
+            cv_z_contours[:, 1] + 0.5,
+            cv_z_contours[:, 0] + 0.5,
+            "-",
+            color="white",
+            linewidth=3,
+        )
+
+    if kl_z_contours is not None:
+        ax_xy.plot(
+            kl_z_contours[:, 1] + 0.5,
+            kl_z_contours[:, 0] + 0.5,
+            "-",
+            color="white",
+            linewidth=3,
+        )
+
+    if base_z_contours is not None:
+        ax_xy.plot(
+            base_z_contours[:, 1] + 0.5,
+            base_z_contours[:, 0] + 0.5,
+            ":",
+            color="black",
+            linewidth=3,
+        )
+
+    if cv_z_contours is not None:
+        ax_xy.plot(
+            cv_z_contours[:, 1] + 0.5,
+            cv_z_contours[:, 0] + 0.5,
+            ":",
+            color="c",
+            linewidth=3,
+        )
+
+    if kl_z_contours is not None:
+        ax_xy.plot(
+            kl_z_contours[:, 1] + 0.5,
+            kl_z_contours[:, 0] + 0.5,
+            ":",
+            color="m",
+            linewidth=3,
+        )
 
     ax_zx.set_xticks([])
     ax_zx.set_yticks([])
@@ -482,48 +492,60 @@ def plot_3d_fits(
         interpolation="nearest",
         origin="lower",
     )
-    ax_zx.plot(
-        base_y_contours[:, 1] + 0.5,
-        base_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
-        "-",
-        color="white",
-        linewidth=3,
-    )
-    ax_zx.plot(
-        cv_y_contours[:, 1] + 0.5,
-        cv_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
-        "-",
-        color="white",
-        linewidth=3,
-    )
-    ax_zx.plot(
-        kl_y_contours[:, 1] + 0.5,
-        kl_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
-        "-",
-        color="white",
-        linewidth=3,
-    )
-    ax_zx.plot(
-        base_y_contours[:, 1] + 0.5,
-        base_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
-        ":",
-        color="black",
-        linewidth=3,
-    )
-    ax_zx.plot(
-        cv_y_contours[:, 1] + 0.5,
-        cv_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
-        ":",
-        color="c",
-        linewidth=3,
-    )
-    ax_zx.plot(
-        kl_y_contours[:, 1] + 0.5,
-        kl_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
-        ":",
-        color="m",
-        linewidth=3,
-    )
+
+    if base_y_contours is not None:
+        ax_zx.plot(
+            base_y_contours[:, 1] + 0.5,
+            base_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+            "-",
+            color="white",
+            linewidth=3,
+        )
+
+    if cv_y_contours is not None:
+        ax_zx.plot(
+            cv_y_contours[:, 1] + 0.5,
+            cv_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+            "-",
+            color="white",
+            linewidth=3,
+        )
+
+    if kl_y_contours is not None:
+        ax_zx.plot(
+            kl_y_contours[:, 1] + 0.5,
+            kl_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+            "-",
+            color="white",
+            linewidth=3,
+        )
+
+    if base_y_contours is not None:
+        ax_zx.plot(
+            base_y_contours[:, 1] + 0.5,
+            base_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+            ":",
+            color="black",
+            linewidth=3,
+        )
+
+    if cv_y_contours is not None:
+        ax_zx.plot(
+            cv_y_contours[:, 1] + 0.5,
+            cv_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+            ":",
+            color="c",
+            linewidth=3,
+        )
+
+    if kl_y_contours is not None:
+        ax_zx.plot(
+            kl_y_contours[:, 1] + 0.5,
+            kl_y_contours[:, 0] + 0.5 * spacing[0] / spacing[1],
+            ":",
+            color="m",
+            linewidth=3,
+        )
 
     ax_yz.set_xticks([])
     ax_yz.set_yticks([])
@@ -536,48 +558,60 @@ def plot_3d_fits(
         interpolation="nearest",
         origin="lower",
     )
-    ax_yz.plot(
-        base_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
-        base_x_contours[:, 1] + 0.5,
-        "-",
-        color="white",
-        linewidth=3,
-    )
-    ax_yz.plot(
-        cv_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
-        cv_x_contours[:, 1] + 0.5,
-        "-",
-        color="white",
-        linewidth=3,
-    )
-    ax_yz.plot(
-        kl_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
-        kl_x_contours[:, 1] + 0.5,
-        "-",
-        color="white",
-        linewidth=3,
-    )
-    ax_yz.plot(
-        base_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
-        base_x_contours[:, 1] + 0.5,
-        ":",
-        color="black",
-        linewidth=3,
-    )
-    ax_yz.plot(
-        cv_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
-        cv_x_contours[:, 1] + 0.5,
-        ":",
-        color="c",
-        linewidth=3,
-    )
-    ax_yz.plot(
-        kl_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
-        kl_x_contours[:, 1] + 0.5,
-        ":",
-        color="m",
-        linewidth=3,
-    )
+
+    if base_x_contours is not None:
+        ax_yz.plot(
+            base_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+            base_x_contours[:, 1] + 0.5,
+            "-",
+            color="white",
+            linewidth=3,
+        )
+
+    if cv_x_contours is not None:
+        ax_yz.plot(
+            cv_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+            cv_x_contours[:, 1] + 0.5,
+            "-",
+            color="white",
+            linewidth=3,
+        )
+
+    if kl_x_contours is not None:
+        ax_yz.plot(
+            kl_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+            kl_x_contours[:, 1] + 0.5,
+            "-",
+            color="white",
+            linewidth=3,
+        )
+
+    if base_x_contours is not None:
+        ax_yz.plot(
+            base_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+            base_x_contours[:, 1] + 0.5,
+            ":",
+            color="black",
+            linewidth=3,
+        )
+
+    if cv_x_contours is not None:
+        ax_yz.plot(
+            cv_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+            cv_x_contours[:, 1] + 0.5,
+            ":",
+            color="c",
+            linewidth=3,
+        )
+
+    if kl_x_contours is not None:
+        ax_yz.plot(
+            kl_x_contours[:, 0] + 0.5 * spacing[0] / spacing[2],
+            kl_x_contours[:, 1] + 0.5,
+            ":",
+            color="m",
+            linewidth=3,
+        )
 
     ax_3D = fig.add_axes(
         [0.525, 0.025, 0.45, 0.45], projection="3d", computed_zorder=True
