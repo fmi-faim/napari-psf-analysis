@@ -238,7 +238,6 @@ class PSFAnalysis:
 
     @staticmethod
     def _fit_gaussian_3d(data, spacing):
-
         crop_xy = max(0, int((data.shape[1] - (3000 / spacing[1])) // 2))
         if crop_xy > 0:
             data_cropped = data[:, crop_xy:-crop_xy, crop_xy:-crop_xy]
@@ -293,7 +292,6 @@ class PSFAnalysis:
 
     @staticmethod
     def _fit_gaussian_2d(data, spacing):
-
         crop_xy = max(0, int((data.shape[0] - (3000 / spacing[1])) // 2))
 
         if crop_xy > 0:

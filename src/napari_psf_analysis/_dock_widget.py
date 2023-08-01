@@ -415,7 +415,6 @@ class PsfAnalysis(QWidget):
         img_data,
         point_data,
     ):
-
         m = PSFAnalysis(
             date=datetime(*date),
             microscope=microscope,

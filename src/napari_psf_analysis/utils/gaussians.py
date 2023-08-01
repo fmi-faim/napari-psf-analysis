@@ -34,8 +34,8 @@ def gaussian_3d(
     """
     return lambda z, y, x: offset + height * np.exp(
         -(
-            ((z - mu_z) ** 2 / (2 * sigma_z ** 2))
-            + ((y - mu_y) ** 2 / (2 * sigma_y ** 2))
-            + ((x - mu_x) ** 2 / (2 * sigma_x ** 2))
+            ((z - mu_z) ** 2 / (2 * sigma_z**2))
+            + ((y - mu_y) ** 2 / (2 * sigma_y**2))
+            + ((x - mu_x) ** 2 / (2 * sigma_x**2))
         )
     )
