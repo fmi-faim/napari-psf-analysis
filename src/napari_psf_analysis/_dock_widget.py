@@ -4,6 +4,7 @@ from os.path import basename, dirname, exists, getctime, join
 
 import napari.layers
 import numpy as np
+import pkg_resources
 import yaml
 from magicgui import magic_factory
 from napari import viewer
@@ -27,8 +28,14 @@ from qtpy.QtWidgets import (
 )
 from skimage.io import imsave
 
-from .psf_analysis.PSFAnalysis import PSFAnalysis
-from .utils.plot_utils import create_psf_overview
+from napari_psf_analysis.psf_analysis.psf_analysis import (
+    analyze_bead,
+    build_summary_figure,
+    create_result_table,
+    localize_beads,
+    merge,
+)
+from napari_psf_analysis.psf_analysis.utils import fwhm
 
 
 def get_microscopes(psf_settings_path):
@@ -161,13 +168,22 @@ class PsfAnalysis(QWidget):
             QLabel("Z-Spacing [nm]", basic_settings), self.z_spacing
         )
 
-        self.psf_box_size = QDoubleSpinBox(parent=basic_settings)
-        self.psf_box_size.setMinimum(1.0)
-        self.psf_box_size.setMaximum(1000000.0)
-        self.psf_box_size.setSingleStep(500.0)
-        self.psf_box_size.setValue(6000.0)
+        self.psf_yx_box_size = QDoubleSpinBox(parent=basic_settings)
+        self.psf_yx_box_size.setMinimum(1.0)
+        self.psf_yx_box_size.setMaximum(1000000.0)
+        self.psf_yx_box_size.setSingleStep(500.0)
+        self.psf_yx_box_size.setValue(2000.0)
         basic_settings.layout().addRow(
-            QLabel("PSF Box Size [nm]", basic_settings), self.psf_box_size
+            QLabel("PSF YX Box Size [nm]", basic_settings), self.psf_yx_box_size
+        )
+
+        self.psf_z_box_size = QDoubleSpinBox(parent=basic_settings)
+        self.psf_z_box_size.setMinimum(1.0)
+        self.psf_z_box_size.setMaximum(1000000.0)
+        self.psf_z_box_size.setSingleStep(500.0)
+        self.psf_z_box_size.setValue(6000.0)
+        basic_settings.layout().addRow(
+            QLabel("PSF Z Box Size [nm]", basic_settings), self.psf_z_box_size
         )
 
         self.temperature = QDoubleSpinBox(parent=advanced_settings)
@@ -333,12 +349,12 @@ class PsfAnalysis(QWidget):
         else:
             microscope = self.microscope.text()
 
-        date = self.date.date().getDate()
         magnification = self.magnification.value()
         na = self.na.value()
         z_spacing = self.z_spacing.value()
         xy_pixelsize = self.xy_pixelsize.value()
-        psf_box_size = self.psf_box_size.value()
+        psf_box_size_yx = self.psf_yx_box_size.value()
+        psf_box_size_z = self.psf_z_box_size.value()
         img_layer = None
         for layer in self._viewer.layers:
             if str(layer) == self.cbox_img.currentText():
@@ -384,13 +400,13 @@ class PsfAnalysis(QWidget):
             self.setEnabled(True)
 
         worker: FunctionWorker = self.measure(
-            date,
             microscope,
             magnification,
             na,
             z_spacing,
             xy_pixelsize,
-            psf_box_size,
+            psf_box_size_z,
+            psf_box_size_yx,
             name,
             img_data,
             point_data,
@@ -404,84 +420,74 @@ class PsfAnalysis(QWidget):
     @thread_worker(progress={"total": 0})
     def measure(
         self,
-        date,
         microscope,
         magnification,
         na,
         z_spacing,
         xy_pixelsize,
-        psf_box_size,
+        psf_box_size_z,
+        psf_box_size_yx,
         name,
         img_data,
         point_data,
     ):
+        date = datetime(*self.date.date().getDate()).strftime("%Y-%m-%d")
+        version = pkg_resources.get_distribution("napari_psf_analysis").version
+        spacing = (z_spacing, xy_pixelsize, xy_pixelsize)
+        patch_size = (psf_box_size_z, psf_box_size_yx, psf_box_size_yx)
 
-        m = PSFAnalysis(
-            date=datetime(*date),
-            microscope=microscope,
-            magnification=magnification,
-            NA=na,
-            spacing=np.array(
-                [
-                    z_spacing,
-                    xy_pixelsize,
-                    xy_pixelsize,
-                ]
-            ),
-            patch_size=np.array(
-                [
-                    psf_box_size,
-                ]
-                * 3
-            ),
+        beads, offsets = localize_beads(
+            img=img_data, points=point_data, spacing=spacing, patch_size=patch_size
         )
 
-        (
-            beads,
-            fitted_params,
-            _,
-            fitted_params_2d,
-            _,
-            self.results,
-        ) = m.analyze(name, img_data, point_data)
-
+        accumulated_results = None
         self.bead_imgs = {}
-        for i in range(len(beads)):
-            bead = beads[i]
-            params = fitted_params[i]
-            vmin = np.sqrt(params[1])
-            vmax = np.sqrt(bead.max())
-            extent = [0, bead.shape[1], 0, bead.shape[2]]
-            entry = self.results.iloc[i]
-            pa1 = entry["PrincipalAxis_1"]
-            pa2 = entry["PrincipalAxis_2"]
-            pa3 = entry["PrincipalAxis_3"]
-            fwhm_x = entry["FWHM_X"]
-            fwhm_y = entry["FWHM_Y"]
-            fwhm_z = entry["FWHM_Z"]
-            fwhm_x_2d = entry["FWHM_X_2D"]
-            fwhm_y_2d = entry["FWHM_Y_2D"]
-            version = entry["version"]
+        for bead, offset in zip(beads, offsets):
+            res = analyze_bead(bead=bead, spacing=spacing)
 
-            image = create_psf_overview(
-                bead,
-                params,
-                vmin,
-                vmax,
-                extent,
-                (pa1, pa2, pa3),
-                (fwhm_x, fwhm_y, fwhm_z),
-                (fwhm_x_2d, fwhm_y_2d),
-                (pa1 // 200 + 1.5) * 100,
-                self.xy_pixelsize.value(),
-                self.z_spacing.value(),
-                datetime(*self.date.date().getDate()).strftime("%Y-%m-%d"),
-                version,
+            summary_fig = build_summary_figure(
+                bead_img=bead,
+                spacing=spacing,
+                location=(res["z_mu"], res["y_mu"], res["x_mu"]),
+                fwhm_values=(res["z_fwhm"], res["y_fwhm"], res["x_fwhm"]),
+                cov_matrix_3d=np.array(
+                    [
+                        [res["zyx_cxx"], res["zyx_cyx"], res["zyx_czx"]],
+                        [res["zyx_cyx"], res["zyx_cyy"], res["zyx_czy"]],
+                        [res["zyx_czx"], res["zyx_czy"], res["zyx_czz"]],
+                    ]
+                ),
+                date=date,
+                version=version,
             )
+            yx_cov_matrix = np.array(
+                [[res["yx_cyy"], res["yx_cyx"]], [res["yx_cyx"], res["yx_cxx"]]]
+            )
+            yx_pc = np.sort(np.sqrt(np.linalg.eigvals(yx_cov_matrix)))[::-1]
 
-            centroid = np.round([entry["X"], entry["Y"], entry["Z"]], 1)
-            bead_name = "{}_Bead_X{}_Y{}_Z{}".format(entry["ImageName"], *centroid)
-            self.bead_imgs[bead_name] = image
+            res["z_mu"] += offset[0] * spacing[0]
+            res["y_mu"] += offset[1] * spacing[1]
+            res["x_mu"] += offset[2] * spacing[2]
+            res["zyx_z_mu"] += offset[0] * spacing[0]
+            res["zyx_y_mu"] += offset[1] * spacing[1]
+            res["zyx_x_mu"] += offset[2] * spacing[2]
+            res["yx_pc1_fwhm"] = fwhm(yx_pc[0])
+            res["yx_pc2_fwhm"] = fwhm(yx_pc[1])
+            res["image_name"] = name
+            res["date"] = date
+            res["microscope"] = microscope
+            res["mag"] = magnification
+            res["NA"] = na
+            res["yx_spacing"] = spacing[1]
+            res["z_spacing"] = spacing[0]
+            res["version"] = version
+            accumulated_results = merge(accumulated_results, res)
+
+            centroid = np.round([res["x_mu"], res["y_mu"], res["z_mu"]], 1)
+            bead_name = "{}_Bead_X{}_Y{}_Z{}".format(res["image_name"], *centroid)
+            self.bead_imgs[bead_name] = summary_fig
+
+        self.results = create_result_table(results=accumulated_results)
 
         if len(self.bead_imgs) > 0:
             measurement_stack = np.stack(
