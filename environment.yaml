@@ -1,0 +1,12 @@
+name: napari-psf-analysis
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - napari
+  - pyqt
+  - openjdk
+  - bioformats_jar
+  - "aicsimageio[all]"
+  - napari-aicsimageio
+  - pip
