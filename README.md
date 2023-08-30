@@ -77,6 +77,7 @@ conda activate psf-analysis
 You can install `napari-psf-analysis` via [pip]:
 
 ```shell
+python -m pip install xmlschema
 python -m pip install napari-psf-analysis
 ```
 
