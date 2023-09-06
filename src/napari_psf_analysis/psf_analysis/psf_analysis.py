@@ -357,7 +357,6 @@ def _draw_fwhm(
     y_fwhm, x_fwhm = fwhm
     dx = (x_fwhm / 2) / spacing
     dy = (y_fwhm / 2) / spacing
-
     if down:
         axes.plot(
             [cx - dx, cx + dx],
@@ -563,6 +562,7 @@ def build_summary_figure(
         spacing=(spacing[0], spacing[2]),
         location=(location[0], location[2]),
     )
+
     ax_zx.imshow(
         _num_to_nan(zx_plane),
         cmap=cmap,
@@ -576,7 +576,7 @@ def build_summary_figure(
         ax_zx,
         spacing=4000 / zx_plane.shape[1],
         fwhm=(fwhm_values[0], fwhm_values[2]),
-        shape=yx_sqrt_projection.shape,
+        shape=zx_plane.shape,
         down=True,
     )
 

@@ -82,7 +82,7 @@ def estimate_from_data(
     sigma:
         Standard deviation of the sample
     """
-    bg = np.median(data)
+    bg = np.median(data).astype(np.uint16)
     amp = sample.max() - bg
 
     z_sample_no_bg = np.clip(sample - bg, 0, data.max())
