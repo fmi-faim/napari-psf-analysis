@@ -18,7 +18,7 @@ A plugin to analyse point spread funcitons (PSFs) of optical systems.
 To run a PSF analysis open an image of acquired beads. Add a point-layer
 and indicate the beads you want to measure by adding a point.
 
-### Run Analyis
+### Run Analysis
 Open the plugin (Plugins > napari-psf-analysis > PSF Analysis) and ensure
 that your bead image and point layers are select in the `Basic` tab under
 `Image` and `Points` respectively.
