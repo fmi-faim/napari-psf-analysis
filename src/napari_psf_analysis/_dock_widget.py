@@ -487,7 +487,8 @@ class PsfAnalysis(QWidget):
             bead_name = "{}_Bead_X{}_Y{}_Z{}".format(res["image_name"], *centroid)
             self.bead_imgs[bead_name] = summary_fig
 
-        self.results = create_result_table(results=accumulated_results)
+        if accumulated_results is not None:
+            self.results = create_result_table(results=accumulated_results)
 
         if len(self.bead_imgs) > 0:
             measurement_stack = np.stack(
