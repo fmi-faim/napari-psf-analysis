@@ -357,7 +357,7 @@ def _draw_fwhm(
     y_fwhm, x_fwhm = fwhm
     dx = (x_fwhm / 2) / spacing
     dy = (y_fwhm / 2) / spacing
-    if down:
+    if down and not np.isnan(x_fwhm):
         axes.plot(
             [cx - dx, cx + dx],
             [
@@ -391,7 +391,7 @@ def _draw_fwhm(
             fontsize=15,
             bbox=dict(facecolor="white", alpha=0.8, linewidth=0),
         )
-    else:
+    elif not np.isnan(x_fwhm):
         axes.plot(
             [cx - dx, cx + dx],
             [
@@ -426,39 +426,40 @@ def _draw_fwhm(
             bbox=dict(facecolor="white", alpha=0.8, linewidth=0),
         )
 
-    axes.plot(
-        [
-            shape[0] / 4,
-        ]
-        * 2,
-        [cy - dy, cy + dy],
-        linewidth=6,
-        c="black",
-        solid_capstyle="butt",
-    )
-    axes.plot(
-        [
-            shape[0] / 4,
-        ]
-        * 2,
-        [cy - dy, cy + dy],
-        linewidth=4,
-        c="white",
-        solid_capstyle="butt",
-    )
-    axes.plot([shape[0] / 4, cx - dx], [cy - dy, cy - dy], "-", color="black")
-    axes.plot([shape[0] / 4, cx - dx], [cy + dy, cy + dy], "-", color="black")
-    axes.plot([shape[0] / 4, cx - dx], [cy - dy, cy - dy], "--", color="white")
-    axes.plot([shape[0] / 4, cx - dx], [cy + dy, cy + dy], "--", color="white")
-    axes.text(
-        shape[1] / 4.5,
-        cy,
-        f"{int(np.round(y_fwhm))}nm",
-        ha="right",
-        va="center",
-        fontsize=15,
-        bbox=dict(facecolor="white", alpha=0.8, linewidth=0),
-    )
+    if not np.isnan(y_fwhm):
+        axes.plot(
+            [
+                shape[0] / 4,
+            ]
+            * 2,
+            [cy - dy, cy + dy],
+            linewidth=6,
+            c="black",
+            solid_capstyle="butt",
+        )
+        axes.plot(
+            [
+                shape[0] / 4,
+            ]
+            * 2,
+            [cy - dy, cy + dy],
+            linewidth=4,
+            c="white",
+            solid_capstyle="butt",
+        )
+        axes.plot([shape[0] / 4, cx - dx], [cy - dy, cy - dy], "-", color="black")
+        axes.plot([shape[0] / 4, cx - dx], [cy + dy, cy + dy], "-", color="black")
+        axes.plot([shape[0] / 4, cx - dx], [cy - dy, cy - dy], "--", color="white")
+        axes.plot([shape[0] / 4, cx - dx], [cy + dy, cy + dy], "--", color="white")
+        axes.text(
+            shape[1] / 4.5,
+            cy,
+            f"{int(np.round(y_fwhm))}nm",
+            ha="right",
+            va="center",
+            fontsize=15,
+            bbox=dict(facecolor="white", alpha=0.8, linewidth=0),
+        )
 
 
 def _get_ellipsoid(cov, spacing):
@@ -511,6 +512,9 @@ def build_summary_figure(
     figure_image
         The figure as RGB image
     """
+    if any(np.isnan(fwhm_values)):
+        show_info("Some FWHM values are NaN.")
+
     fig = plt.figure(figsize=(10, 10))
 
     ax_xy, ax_yz, ax_zx, ax_3d, ax_3d_text = _add_axes(fig)
@@ -628,20 +632,24 @@ def _add_ellipsoids(
     fwhm: Tuple[float, float, float],
     spacing: Tuple[float, float, float],
 ) -> Tuple[Tuple[ArrayLike, ...], Tuple[ArrayLike, ...]]:
-    base_ell = _get_ellipsoid(
-        [
-            [(fwhm[2] / (2 * np.sqrt(2 * np.log(2)))) ** 2, 0, 0],
-            [0, (fwhm[1] / (2 * np.sqrt(2 * np.log(2)))) ** 2, 0],
-            [0, 0, (fwhm[0] / (2 * np.sqrt(2 * np.log(2)))) ** 2],
-        ],
-        spacing,
-    )
-    ax_3d.plot_surface(
-        *base_ell, rstride=2, cstride=2, color="white", antialiased=True, alpha=1
-    )
-    ax_3d.plot_wireframe(
-        *base_ell, rstride=3, cstride=3, color="black", antialiased=True, alpha=0.5
-    )
+    if not any(np.isnan(fwhm)):
+        base_ell = _get_ellipsoid(
+            [
+                [(fwhm[2] / (2 * np.sqrt(2 * np.log(2)))) ** 2, 0, 0],
+                [0, (fwhm[1] / (2 * np.sqrt(2 * np.log(2)))) ** 2, 0],
+                [0, 0, (fwhm[0] / (2 * np.sqrt(2 * np.log(2)))) ** 2],
+            ],
+            spacing,
+        )
+        ax_3d.plot_surface(
+            *base_ell, rstride=2, cstride=2, color="white", antialiased=True, alpha=1
+        )
+        ax_3d.plot_wireframe(
+            *base_ell, rstride=3, cstride=3, color="black", antialiased=True, alpha=0.5
+        )
+    else:
+        base_ell = None
+
     cv_ell = _get_ellipsoid(cov_matrix_3d, spacing)
     ax_3d.plot_surface(
         *cv_ell, rstride=1, cstride=1, color="navy", antialiased=True, alpha=0.15
@@ -675,69 +683,71 @@ def _add_zyx_ellipsoid_projections(
     base_ell: Tuple[ArrayLike, ArrayLike, ArrayLike],
     cv_ell: Tuple[ArrayLike, ArrayLike, ArrayLike],
 ):
-    ax_3d.contour(
-        *base_ell,
-        zdir="z",
-        offset=ax_3d.get_zlim()[0],
-        colors="white",
-        levels=1,
-        vmin=-1,
-        vmax=1,
-        zorder=0,
-    )
-    ax_3d.contour(
-        *base_ell,
-        zdir="y",
-        offset=ax_3d.get_ylim()[1],
-        colors="white",
-        levels=1,
-        vmin=-1,
-        vmax=1,
-        zorder=0,
-    )
-    ax_3d.contour(
-        *base_ell,
-        zdir="x",
-        offset=ax_3d.get_xlim()[0],
-        colors="white",
-        levels=1,
-        vmin=-1,
-        vmax=1,
-        zorder=0,
-    )
-    ax_3d.contour(
-        *base_ell,
-        zdir="z",
-        offset=ax_3d.get_zlim()[0],
-        colors="black",
-        levels=1,
-        vmin=-1,
-        vmax=1,
-        zorder=0,
-        linestyles="--",
-    )
-    ax_3d.contour(
-        *base_ell,
-        zdir="y",
-        offset=ax_3d.get_ylim()[1],
-        colors="black",
-        levels=1,
-        vmin=-1,
-        vmax=1,
-        zorder=0,
-        linestyles="--",
-    )
-    ax_3d.contour(
-        *base_ell,
-        zdir="x",
-        offset=ax_3d.get_xlim()[0],
-        colors="black",
-        levels=1,
-        vmin=-1,
-        vmax=1,
-        zorder=0,
-        linestyles="--",
-    )
+    if base_ell is not None:
+        ax_3d.contour(
+            *base_ell,
+            zdir="z",
+            offset=ax_3d.get_zlim()[0],
+            colors="white",
+            levels=1,
+            vmin=-1,
+            vmax=1,
+            zorder=0,
+        )
+        ax_3d.contour(
+            *base_ell,
+            zdir="y",
+            offset=ax_3d.get_ylim()[1],
+            colors="white",
+            levels=1,
+            vmin=-1,
+            vmax=1,
+            zorder=0,
+        )
+        ax_3d.contour(
+            *base_ell,
+            zdir="x",
+            offset=ax_3d.get_xlim()[0],
+            colors="white",
+            levels=1,
+            vmin=-1,
+            vmax=1,
+            zorder=0,
+        )
+        ax_3d.contour(
+            *base_ell,
+            zdir="z",
+            offset=ax_3d.get_zlim()[0],
+            colors="black",
+            levels=1,
+            vmin=-1,
+            vmax=1,
+            zorder=0,
+            linestyles="--",
+        )
+        ax_3d.contour(
+            *base_ell,
+            zdir="y",
+            offset=ax_3d.get_ylim()[1],
+            colors="black",
+            levels=1,
+            vmin=-1,
+            vmax=1,
+            zorder=0,
+            linestyles="--",
+        )
+        ax_3d.contour(
+            *base_ell,
+            zdir="x",
+            offset=ax_3d.get_xlim()[0],
+            colors="black",
+            levels=1,
+            vmin=-1,
+            vmax=1,
+            zorder=0,
+            linestyles="--",
+        )
+
     ax_3d.contour(
         *cv_ell,
         zdir="z",
