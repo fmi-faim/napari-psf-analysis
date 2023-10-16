@@ -9,4 +9,9 @@ dependencies:
   - bioformats_jar
   - "aicsimageio[all]"
   - "pydantic<2"
+  - sphinx
+  - furo
+  - myst-parser
+  - sphinx-inline-tabs
+  - sphinx-copybutton
   - pip

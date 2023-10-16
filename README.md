@@ -10,9 +10,10 @@
 This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookiecutter-napari-plugin] template.
 
 ---
-![application_screenshot](./figs/napari-psf-analysis_demo.gif)
+![application_screenshot](figs/napari-psf-analysis_demo.gif)
+<!-- start abstract -->
 A plugin to analyse point spread funcitons (PSFs) of optical systems.
-
+<!-- end abstract -->
 ## Usage
 ### Starting Point
 To run a PSF analysis open an image of acquired beads. Add a point-layer
@@ -49,7 +50,7 @@ Additionally a `PSFMeasurement_{source_image_acquisition_date}_
 stored containing the measured values and all filled in fields.
 
 ---
-
+<!-- start install -->
 ## Installation
 We recommend installation into a fresh conda environment.
 
@@ -97,6 +98,7 @@ To use this config navigate to `Plugins > napari-psf-analysis > Set Config` and 
 
 __Note:__ The save path is OS specific.
 
+<!-- end install -->
 ### 5. Desktop Icon for Windows
 Follow [these instructions](https://twitter.com/haesleinhuepf/status/1537030855843094529) by Robert Haase.
 
