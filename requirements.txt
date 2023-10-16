@@ -3,5 +3,7 @@
 # See also: https://caremad.io/posts/2013/07/setup-vs-requirement/
 pytest
 pytest-cov
+pytest-qt
+napari
 
 -e .

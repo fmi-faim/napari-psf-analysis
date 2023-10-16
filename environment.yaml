@@ -8,5 +8,5 @@ dependencies:
   - openjdk
   - bioformats_jar
   - "aicsimageio[all]"
-  - napari-aicsimageio
+  - "pydantic<2"
   - pip
