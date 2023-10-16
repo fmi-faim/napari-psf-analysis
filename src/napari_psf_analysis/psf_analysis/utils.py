@@ -5,6 +5,22 @@ from numpy._typing import ArrayLike
 from skimage.measure import centroid
 
 
+def sigma(fwhm: float) -> float:
+    """Compute sigma from full width half maximum.
+
+    Parameters
+    ----------
+    fwhm :
+        full width half maximum
+
+    Returns
+    -------
+    float
+        sigma
+    """
+    return fwhm / (2 * np.sqrt(2 * np.log(2)))
+
+
 def fwhm(sigma: float) -> float:
     """Full width at half maximum.
 
