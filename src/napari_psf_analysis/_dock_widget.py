@@ -17,9 +17,11 @@ from qtpy.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QProgressBar,
     QPushButton,
     QSpinBox,
     QTabWidget,
@@ -28,14 +30,8 @@ from qtpy.QtWidgets import (
 )
 from skimage.io import imsave
 
-from napari_psf_analysis.psf_analysis.psf_analysis import (
-    analyze_bead,
-    build_summary_figure,
-    create_result_table,
-    localize_beads,
-    merge,
-)
-from napari_psf_analysis.psf_analysis.utils import fwhm
+from napari_psf_analysis.psf_analysis.analyzer import Analyzer
+from napari_psf_analysis.psf_analysis.parameters import PSFAnalysisInputs
 
 
 def get_microscopes(psf_settings_path):
@@ -46,6 +42,16 @@ def get_microscopes(psf_settings_path):
             return [s for s in settings["microscopes"]]
 
     return "Microscope"
+
+
+def get_dpi(psf_settings_path):
+    if psf_settings_path and exists(psf_settings_path):
+        settings = load_settings(psf_settings_path)
+
+        if settings and "dpi" in settings.keys():
+            return settings["dpi"]
+
+    return "150"
 
 
 def get_output_path(psf_settings_path):
@@ -76,10 +82,6 @@ def get_psf_analysis_settings_path():
     return None
 
 
-def layer_widget(layer: napari.layers.Image):
-    return layer
-
-
 class PsfAnalysis(QWidget):
     def __init__(self, napari_viewer, parent=None):
         super().__init__(parent=parent)
@@ -91,45 +93,202 @@ class PsfAnalysis(QWidget):
         self.bead_imgs = None
         self.results = None
 
+        self.cancel_extraction = False
+
         self.setLayout(QVBoxLayout())
         self.setMinimumWidth(300)
-        self.setMaximumHeight(500)
+        self.setMaximumHeight(820)
+        self._add_logo()
 
         setting_tabs = QTabWidget(parent=self)
         setting_tabs.setLayout(QHBoxLayout())
 
-        basic_settings = QWidget(parent=setting_tabs)
-        advanced_settings = QWidget(parent=setting_tabs)
+        self._add_basic_settings_tab(setting_tabs)
+        self._add_advanced_settings_tab(setting_tabs)
 
-        setting_tabs.addTab(basic_settings, "Basic")
+        self.layout().addWidget(setting_tabs)
+
+        self._add_interaction_buttons()
+
+        self._add_save_dialog()
+
+        self.current_img_index = -1
+        self.cbox_img.currentIndexChanged.connect(self._img_selection_changed)
+        self.fill_layer_boxes()
+
+    def _add_logo(self):
+        logo = pathlib.Path(__file__).parent / "resources/logo.png"
+        logo_label = QLabel()
+        logo_label.setText(f'<img src="{logo}" width="320">')
+        self.layout().addWidget(logo_label)
+
+    def _add_save_dialog(self):
+        pane = QGroupBox(parent=self)
+        pane.setLayout(QFormLayout())
+        dir_selection_dialog = QWidget(parent=self)
+        dir_selection_dialog.setLayout(QHBoxLayout())
+        self.save_path = QFileDialog()
+        self.save_path.setFileMode(QFileDialog.DirectoryOnly)
+        self.save_path.setDirectory(
+            str(get_output_path(get_psf_analysis_settings_path()))
+        )
+        self.save_dir_line_edit = QLineEdit()
+        self.save_dir_line_edit.setText(self.save_path.directory().path())
+        choose_dir = QPushButton("...")
+        choose_dir.clicked.connect(self.select_save_dir)
+        dir_selection_dialog.layout().addWidget(
+            QLabel("Save Dir", dir_selection_dialog)
+        )
+        dir_selection_dialog.layout().addWidget(self.save_dir_line_edit)
+        dir_selection_dialog.layout().addWidget(choose_dir)
+        pane.layout().addRow(dir_selection_dialog)
+        self.save_button = QPushButton("Save Measurements")
+        self.save_button.setEnabled(True)
+        self.save_button.clicked.connect(self.save_measurements)
+        pane.layout().addRow(self.save_button)
+        self.layout().addWidget(pane)
+
+    def _add_interaction_buttons(self):
+        pane = QGroupBox(parent=self)
+        pane.setLayout(QFormLayout())
+        self.extract_psfs = QPushButton("Extract PSFs")
+        self.extract_psfs.clicked.connect(self.prepare_measure)
+        pane.layout().addRow(self.extract_psfs)
+        self.cancel = QPushButton("Cancel")
+        self.cancel.clicked.connect(self.request_cancel)
+        pane.layout().addRow(self.cancel)
+        self.progressbar = QProgressBar(parent=self)
+        self.progressbar.setValue(0)
+        pane.layout().addRow(self.progressbar)
+        self.delete_measurement = QPushButton("Delete Displayed Measurement")
+        self.delete_measurement.setEnabled(False)
+        self.delete_measurement.clicked.connect(self.delete_measurement_action)
+        pane.layout().addRow(self.delete_measurement)
+        self.layout().addWidget(pane)
+
+    def _add_advanced_settings_tab(self, setting_tabs):
+        advanced_settings = QWidget(parent=setting_tabs)
         setting_tabs.addTab(advanced_settings, "Advanced")
         advanced_settings.setLayout(QFormLayout())
+        self.temperature = QDoubleSpinBox(parent=advanced_settings)
+        self.temperature.setToolTip("Temperature at which this PSF was " "acquired.")
+        self.temperature.setMinimum(-100)
+        self.temperature.setMaximum(200)
+        self.temperature.setSingleStep(0.1)
+        self.temperature.clear()
+        advanced_settings.layout().addRow(
+            QLabel("Temperature", advanced_settings), self.temperature
+        )
+        self.airy_unit = QDoubleSpinBox(parent=advanced_settings)
+        self.airy_unit.setToolTip(
+            "The airy unit relates to your pinhole " "size on confocal systems."
+        )
+        self.airy_unit.setMinimum(0)
+        self.airy_unit.setMaximum(1000)
+        self.airy_unit.setSingleStep(0.1)
+        self.airy_unit.clear()
+        advanced_settings.layout().addRow(
+            QLabel("Airy Unit", advanced_settings), self.airy_unit
+        )
+        self.bead_size = QDoubleSpinBox(parent=advanced_settings)
+        self.bead_size.setToolTip("Physical bead size in nano meters.")
+        self.bead_size.setMinimum(0)
+        self.bead_size.setMaximum(1000)
+        self.bead_size.setSingleStep(1)
+        self.bead_size.clear()
+        advanced_settings.layout().addRow(
+            QLabel("Bead Size [nm]", advanced_settings), self.bead_size
+        )
+        self.bead_supplier = QLineEdit()
+        self.bead_supplier.setToolTip("Manufacturer of the beads.")
+        advanced_settings.layout().addRow(
+            QLabel("Bead Supplier", advanced_settings), self.bead_supplier
+        )
+        self.mounting_medium = QLineEdit()
+        self.mounting_medium.setToolTip("Name of the mounting medium.")
+        advanced_settings.layout().addRow(
+            QLabel("Mounting Medium", advanced_settings), self.mounting_medium
+        )
+        self.operator = QLineEdit()
+        self.operator.setToolTip("Person in charge of the PSF acquisition.")
+        advanced_settings.layout().addRow(
+            QLabel("Operator", advanced_settings), self.operator
+        )
+        self.microscope_type = QLineEdit()
+        self.microscope_type.setToolTip(
+            "Type of microscope used for the PSF acquisition."
+        )
+        advanced_settings.layout().addRow(
+            QLabel("Mircoscope Type", advanced_settings), self.microscope_type
+        )
+        self.excitation = QDoubleSpinBox(parent=advanced_settings)
+        self.excitation.setToolTip("Excitation wavelength used to image the " "beads.")
+        self.excitation.setMinimum(0)
+        self.excitation.setMaximum(1000)
+        self.excitation.setSingleStep(1)
+        self.excitation.clear()
+        advanced_settings.layout().addRow(
+            QLabel("Excitation", advanced_settings), self.excitation
+        )
+        self.emission = QDoubleSpinBox(parent=advanced_settings)
+        self.emission.setToolTip("Emission wavelength of the beads.")
+        self.emission.setMinimum(0)
+        self.emission.setMaximum(1000)
+        self.emission.setSingleStep(1)
+        self.emission.clear()
+        advanced_settings.layout().addRow(
+            QLabel("Emission", advanced_settings), self.emission
+        )
+        self.comment = QLineEdit()
+        self.comment.setToolTip("Additional comment for this specific " "measurement.")
+        advanced_settings.layout().addRow(
+            QLabel("Comment", advanced_settings), self.comment
+        )
+        self.summary_figure_dpi = QComboBox(parent=advanced_settings)
+        self.summary_figure_dpi.setToolTip("DPI/PPI of summary figure.")
+        self.summary_figure_dpi.addItems(["96", "150", "300"])
+        self.summary_figure_dpi.setCurrentText(
+            get_dpi(get_psf_analysis_settings_path())
+        )
+        advanced_settings.layout().addRow(
+            QLabel("DPI/PPI", advanced_settings), self.summary_figure_dpi
+        )
+
+    def _add_basic_settings_tab(self, setting_tabs):
+        basic_settings = QWidget(parent=setting_tabs)
+        setting_tabs.addTab(basic_settings, "Basic")
         basic_settings.setLayout(QFormLayout())
-
         self.cbox_img = QComboBox(parent=basic_settings)
+        self.cbox_img.setToolTip(
+            "Image layer with the measured point spread functions (PSFs)."
+        )
         self.cbox_point = QComboBox(parent=basic_settings)
-
+        self.cbox_point.setToolTip(
+            "Points layer indicating which PSFs should " "be measured."
+        )
         basic_settings.layout().addRow(QLabel("Image", basic_settings), self.cbox_img)
         basic_settings.layout().addRow(
             QLabel("Points", basic_settings), self.cbox_point
         )
-
         self.date = QDateEdit(datetime.today())
+        self.date.setToolTip("Acquisition date of the PSFs.")
         basic_settings.layout().addRow(
             QLabel("Acquisition Date", basic_settings), self.date
         )
-
         microscope_options = get_microscopes(get_psf_analysis_settings_path())
         if isinstance(microscope_options, list):
             self.microscope = QComboBox(parent=basic_settings)
             self.microscope.addItems(microscope_options)
         else:
             self.microscope = QLineEdit(microscope_options)
+        self.microscope.setToolTip(
+            "Name of the microscope which was used to" " acquire the PSFs."
+        )
         basic_settings.layout().addRow(
             QLabel("Microscope", basic_settings), self.microscope
         )
-
         self.magnification = QSpinBox(parent=basic_settings)
+        self.magnification.setToolTip("Total magnification of the system.")
         self.magnification.setMinimum(0)
         self.magnification.setMaximum(10000)
         self.magnification.setValue(100)
@@ -137,20 +296,20 @@ class PsfAnalysis(QWidget):
         basic_settings.layout().addRow(
             QLabel("Magnification", basic_settings), self.magnification
         )
-
         self.objective_id = QLineEdit("obj_1")
+        self.objective_id.setToolTip("Objective identifier (or name).")
         basic_settings.layout().addRow(
             QLabel("Objective ID", basic_settings), self.objective_id
         )
-
         self.na = QDoubleSpinBox(parent=basic_settings)
+        self.na.setToolTip("Numerical aperture of the objective.")
         self.na.setMinimum(0.0)
         self.na.setMaximum(1.7)
         self.na.setSingleStep(0.05)
         self.na.setValue(1.4)
         basic_settings.layout().addRow(QLabel("NA", basic_settings), self.na)
-
         self.xy_pixelsize = QDoubleSpinBox(parent=basic_settings)
+        self.xy_pixelsize.setToolTip("Pixel size in XY dimensions in nano " "meters.")
         self.xy_pixelsize.setMinimum(0.0)
         self.xy_pixelsize.setMaximum(10000.0)
         self.xy_pixelsize.setSingleStep(10.0)
@@ -158,8 +317,10 @@ class PsfAnalysis(QWidget):
         basic_settings.layout().addRow(
             QLabel("XY-Pixelsize [nm]", basic_settings), self.xy_pixelsize
         )
-
         self.z_spacing = QDoubleSpinBox(parent=basic_settings)
+        self.z_spacing.setToolTip(
+            "Distance between two neighboring planes " "in nano meters."
+        )
         self.z_spacing.setMinimum(0.0)
         self.z_spacing.setMaximum(10000.0)
         self.z_spacing.setSingleStep(10.0)
@@ -167,8 +328,11 @@ class PsfAnalysis(QWidget):
         basic_settings.layout().addRow(
             QLabel("Z-Spacing [nm]", basic_settings), self.z_spacing
         )
-
         self.psf_yx_box_size = QDoubleSpinBox(parent=basic_settings)
+        self.psf_yx_box_size.setToolTip(
+            "For analysis each PSF is cropped "
+            "out of the input image. This is the XY size of the crop in nano meters."
+        )
         self.psf_yx_box_size.setMinimum(1.0)
         self.psf_yx_box_size.setMaximum(1000000.0)
         self.psf_yx_box_size.setSingleStep(500.0)
@@ -176,8 +340,10 @@ class PsfAnalysis(QWidget):
         basic_settings.layout().addRow(
             QLabel("PSF YX Box Size [nm]", basic_settings), self.psf_yx_box_size
         )
-
         self.psf_z_box_size = QDoubleSpinBox(parent=basic_settings)
+        self.psf_z_box_size.setToolTip(
+            "This is the Z size of the PSF crop " "in nano meters. "
+        )
         self.psf_z_box_size.setMinimum(1.0)
         self.psf_z_box_size.setMaximum(1000000.0)
         self.psf_z_box_size.setSingleStep(500.0)
@@ -186,120 +352,19 @@ class PsfAnalysis(QWidget):
             QLabel("PSF Z Box Size [nm]", basic_settings), self.psf_z_box_size
         )
 
-        self.temperature = QDoubleSpinBox(parent=advanced_settings)
-        self.temperature.setMinimum(-100)
-        self.temperature.setMaximum(200)
-        self.temperature.setSingleStep(0.1)
-        self.temperature.clear()
-        advanced_settings.layout().addRow(
-            QLabel("Temperature", advanced_settings), self.temperature
-        )
-
-        self.airy_unit = QDoubleSpinBox(parent=advanced_settings)
-        self.airy_unit.setMinimum(0)
-        self.airy_unit.setMaximum(1000)
-        self.airy_unit.setSingleStep(0.1)
-        self.airy_unit.clear()
-        advanced_settings.layout().addRow(
-            QLabel("Airy Unit", advanced_settings), self.airy_unit
-        )
-
-        self.bead_size = QDoubleSpinBox(parent=advanced_settings)
-        self.bead_size.setMinimum(0)
-        self.bead_size.setMaximum(1000)
-        self.bead_size.setSingleStep(1)
-        self.bead_size.clear()
-        advanced_settings.layout().addRow(
-            QLabel("Bead Size [nm]", advanced_settings), self.bead_size
-        )
-
-        self.bead_supplier = QLineEdit()
-        advanced_settings.layout().addRow(
-            QLabel("Bead Supplier", advanced_settings), self.bead_supplier
-        )
-
-        self.mounting_medium = QLineEdit()
-        advanced_settings.layout().addRow(
-            QLabel("Mounting Medium", advanced_settings), self.mounting_medium
-        )
-
-        self.operator = QLineEdit()
-        advanced_settings.layout().addRow(
-            QLabel("Operator", advanced_settings), self.operator
-        )
-
-        self.microscope_type = QLineEdit()
-        advanced_settings.layout().addRow(
-            QLabel("Mircoscope Type", advanced_settings), self.microscope_type
-        )
-
-        self.excitation = QDoubleSpinBox(parent=advanced_settings)
-        self.excitation.setMinimum(0)
-        self.excitation.setMaximum(1000)
-        self.excitation.setSingleStep(1)
-        self.excitation.clear()
-        advanced_settings.layout().addRow(
-            QLabel("Excitation", advanced_settings), self.excitation
-        )
-
-        self.emission = QDoubleSpinBox(parent=advanced_settings)
-        self.emission.setMinimum(0)
-        self.emission.setMaximum(1000)
-        self.emission.setSingleStep(1)
-        self.emission.clear()
-        advanced_settings.layout().addRow(
-            QLabel("Emission", advanced_settings), self.emission
-        )
-
-        self.comment = QLineEdit()
-        advanced_settings.layout().addRow(
-            QLabel("Comment", advanced_settings), self.comment
-        )
-
-        self.layout().addWidget(setting_tabs)
-
-        self.extract_psfs = QPushButton("Extract PSFs")
-        self.extract_psfs.clicked.connect(lambda: self.prepare_measure())
-        self.layout().addWidget(self.extract_psfs)
-
-        self.delete_measurement = QPushButton("Delete Displayed Measurement")
-        self.delete_measurement.setEnabled(False)
-        self.delete_measurement.clicked.connect(self.delete_measurements)
-        self.layout().addWidget(self.delete_measurement)
-
-        dir_selection_dialog = QWidget(parent=self)
-        dir_selection_dialog.setLayout(QHBoxLayout())
-        self.save_path = QFileDialog()
-        self.save_path.setFileMode(QFileDialog.DirectoryOnly)
-        self.save_path.setDirectory(
-            str(get_output_path(get_psf_analysis_settings_path()))
-        )
-
-        self.save_dir_line_edit = QLineEdit()
-        self.save_dir_line_edit.setText(self.save_path.directory().path())
-
-        choose_dir = QPushButton("...")
-        choose_dir.clicked.connect(self.select_save_dir)
-
-        dir_selection_dialog.layout().addWidget(
-            QLabel("Save Dir", dir_selection_dialog)
-        )
-        dir_selection_dialog.layout().addWidget(self.save_dir_line_edit)
-        dir_selection_dialog.layout().addWidget(choose_dir)
-
-        self.layout().addWidget(dir_selection_dialog)
-        self.save_button = QPushButton("Save Measurements")
-        self.save_button.setEnabled(True)
-        self.save_button.clicked.connect(self.save_measurements)
-        self.layout().addWidget(self.save_button)
-
-        self.current_img_index = -1
-        self.cbox_img.currentIndexChanged.connect(self._img_selection_changed)
-        self.fill_layer_boxes()
-
     def select_save_dir(self):
         self.save_path.exec_()
+        self.save_path.setToolTip(
+            "Select the directory in which the "
+            "extracted values and summary images are "
+            "stored."
+        )
         self.save_dir_line_edit.setText(self.save_path.directory().path())
+        self.save_dir_line_edit.setToolTip(
+            "Select the directory in which the "
+            "extracted values and summary images are "
+            "stored."
+        )
 
     def fill_layer_boxes(self):
         for layer in self._viewer.layers:
@@ -343,47 +408,20 @@ class PsfAnalysis(QWidget):
                 self._viewer.layers.selection.active.name == "Analyzed Beads"
             )
 
+    def request_cancel(self):
+        self.cancel_extraction = True
+        self.cancel.setText("Cancelling...")
+
     def prepare_measure(self):
-        if isinstance(self.microscope, QComboBox):
-            microscope = self.microscope.currentText()
-        else:
-            microscope = self.microscope.text()
-
-        magnification = self.magnification.value()
-        na = self.na.value()
-        z_spacing = self.z_spacing.value()
-        xy_pixelsize = self.xy_pixelsize.value()
-        psf_box_size_yx = self.psf_yx_box_size.value()
-        psf_box_size_z = self.psf_z_box_size.value()
-        img_layer = None
-        for layer in self._viewer.layers:
-            if str(layer) == self.cbox_img.currentText():
-                img_layer = layer
-        if img_layer is None:
+        img_data = self._get_img_data()
+        if img_data is None:
             return
 
-        point_layer = None
-        for layer in self._viewer.layers:
-            if str(layer) == self.cbox_point.currentText():
-                point_layer = layer
-        if point_layer is None:
+        point_data = self._get_point_data()
+        if point_data is None:
             return
 
-        if len(img_layer.data.shape) != 3:
-            raise NotImplementedError(
-                f"Only 3 dimensional data is "
-                f"supported. Your data has {(img_layer.data.shape)} dimensions."
-            )
-
-        from bfio.bfio import NapariReader
-
-        if isinstance(img_layer.data, NapariReader):
-            img_data = np.transpose(img_layer.data.br.read(), [2, 0, 1]).copy()
-        else:
-            img_data = img_layer.data.copy()
-
-        point_data = point_layer.data.copy()
-        name = basename(img_layer.source.path)
+        self._setup_progressbar(point_data)
 
         def _on_done(result):
             if result is not None:
@@ -397,116 +435,143 @@ class PsfAnalysis(QWidget):
                 )
                 self._viewer.dims.set_point(0, 0)
                 self._viewer.reset_view()
-            self.setEnabled(True)
+            _reset_state()
 
-        worker: FunctionWorker = self.measure(
-            microscope,
-            magnification,
-            na,
-            z_spacing,
-            xy_pixelsize,
-            psf_box_size_z,
-            psf_box_size_yx,
-            name,
-            img_data,
-            point_data,
+        def _update_progress(progress: float):
+            self.progressbar.setValue(progress)
+            if self.cancel_extraction:
+                worker.quit()
+
+        def _reset_state():
+            if self.cancel_extraction:
+                self.progressbar.setValue(0)
+            self.cancel_extraction = False
+            self.cancel.setEnabled(False)
+            self.cancel.setText("Cancel")
+            self.extract_psfs.setEnabled(True)
+            self.progressbar.reset()
+
+        @thread_worker(progress={"total": len(point_data)})
+        def measure(parameters: PSFAnalysisInputs):
+            analyzer = Analyzer(parameters=parameters)
+
+            yield from analyzer
+
+            self.results = analyzer.get_results()
+            measurement_stack, measurement_scale = analyzer.get_summary_figure_stack(
+                bead_img_scale=self._viewer.layers[self.cbox_img.currentText()].scale,
+                bead_img_shape=self._viewer.layers[
+                    self.cbox_img.currentText()
+                ].data.shape,
+            )
+
+            if measurement_stack is not None:
+                return measurement_stack, measurement_scale
+
+        worker: FunctionWorker = measure(
+            parameters=PSFAnalysisInputs(
+                microscope=self._get_microscope(),
+                magnification=self.magnification.value(),
+                na=self.na.value(),
+                spacing=self._get_spacing(),
+                patch_size=self._get_patch_size(),
+                name=self._get_img_name(),
+                img_data=img_data,
+                point_data=point_data,
+                dpi=int(self.summary_figure_dpi.currentText()),
+                date=datetime(*self.date.date().getDate()).strftime("%Y-%m-%d"),
+                version=pkg_resources.get_distribution("napari_psf_analysis").version,
+            )
         )
 
+        worker.yielded.connect(_update_progress)
         worker.returned.connect(_on_done)
+        worker.aborted.connect(_reset_state)
+        worker.errored.connect(_reset_state)
         worker.start()
 
-        self.setEnabled(False)
+        self.extract_psfs.setEnabled(False)
+        self.cancel.setEnabled(True)
 
-    @thread_worker(progress={"total": 0})
-    def measure(
-        self,
-        microscope,
-        magnification,
-        na,
-        z_spacing,
-        xy_pixelsize,
-        psf_box_size_z,
-        psf_box_size_yx,
-        name,
-        img_data,
-        point_data,
-    ):
-        date = datetime(*self.date.date().getDate()).strftime("%Y-%m-%d")
-        version = pkg_resources.get_distribution("napari_psf_analysis").version
-        spacing = (z_spacing, xy_pixelsize, xy_pixelsize)
-        patch_size = (psf_box_size_z, psf_box_size_yx, psf_box_size_yx)
+    def _setup_progressbar(self, point_data):
+        self.progressbar.reset()
+        self.progressbar.setMaximum(0)
+        self.progressbar.setMaximum(len(point_data))
+        self.progressbar.setValue(0.0001)
 
-        beads, offsets = localize_beads(
-            img=img_data, points=point_data, spacing=spacing, patch_size=patch_size
+    def _get_img_name(self):
+        img_layer = None
+        for layer in self._viewer.layers:
+            if str(layer) == self.cbox_img.currentText():
+                img_layer = layer
+
+        if img_layer is None:
+            return None
+        else:
+            return basename(img_layer.source.path)
+
+    def _get_point_data(self):
+        point_layer = None
+        for layer in self._viewer.layers:
+            if str(layer) == self.cbox_point.currentText():
+                point_layer = layer
+        if point_layer is None:
+            show_info(
+                "Please add a point-layer and annotate the beads you "
+                "want to analyze."
+            )
+            return None
+        else:
+            return point_layer.data.copy()
+
+    def _get_img_data(self):
+        img_layer = None
+        for layer in self._viewer.layers:
+            if str(layer) == self.cbox_img.currentText():
+                img_layer = layer
+
+        if img_layer is None:
+            show_info("Please add an image and select it.")
+            return None
+
+        if len(img_layer.data.shape) != 3:
+            raise NotImplementedError(
+                f"Only 3 dimensional data is "
+                f"supported. Your data has {(img_layer.data.shape)} dimensions."
+            )
+
+        from bfio.bfio import BioReader
+
+        if isinstance(img_layer.data, BioReader):
+            img_data = np.transpose(img_layer.data.br.read(), [2, 0, 1]).copy()
+        else:
+            img_data = img_layer.data.copy()
+
+        return img_data
+
+    def _get_patch_size(self):
+        return (
+            (self.psf_z_box_size.value()),
+            (self.psf_yx_box_size.value()),
+            (self.psf_yx_box_size.value()),
         )
 
-        accumulated_results = None
-        self.bead_imgs = {}
-        for bead, offset in zip(beads, offsets):
-            res = analyze_bead(bead=bead, spacing=spacing)
+    def _get_spacing(self):
+        spacing = (
+            self.z_spacing.value(),
+            self.xy_pixelsize.value(),
+            self.xy_pixelsize.value(),
+        )
+        return spacing
 
-            summary_fig = build_summary_figure(
-                bead_img=bead,
-                spacing=spacing,
-                location=(res["z_mu"], res["y_mu"], res["x_mu"]),
-                fwhm_values=(res["z_fwhm"], res["y_fwhm"], res["x_fwhm"]),
-                cov_matrix_3d=np.array(
-                    [
-                        [res["zyx_cxx"], res["zyx_cyx"], res["zyx_czx"]],
-                        [res["zyx_cyx"], res["zyx_cyy"], res["zyx_czy"]],
-                        [res["zyx_czx"], res["zyx_czy"], res["zyx_czz"]],
-                    ]
-                ),
-                date=date,
-                version=version,
-            )
-            yx_cov_matrix = np.array(
-                [[res["yx_cyy"], res["yx_cyx"]], [res["yx_cyx"], res["yx_cxx"]]]
-            )
-            yx_pc = np.sort(np.sqrt(np.linalg.eigvals(yx_cov_matrix)))[::-1]
+    def _get_microscope(self):
+        if isinstance(self.microscope, QComboBox):
+            microscope = self.microscope.currentText()
+        else:
+            microscope = self.microscope.text()
+        return microscope
 
-            res["z_mu"] += offset[0] * spacing[0]
-            res["y_mu"] += offset[1] * spacing[1]
-            res["x_mu"] += offset[2] * spacing[2]
-            res["zyx_z_mu"] += offset[0] * spacing[0]
-            res["zyx_y_mu"] += offset[1] * spacing[1]
-            res["zyx_x_mu"] += offset[2] * spacing[2]
-            res["yx_pc1_fwhm"] = fwhm(yx_pc[0])
-            res["yx_pc2_fwhm"] = fwhm(yx_pc[1])
-            res["image_name"] = name
-            res["date"] = date
-            res["microscope"] = microscope
-            res["mag"] = magnification
-            res["NA"] = na
-            res["yx_spacing"] = spacing[1]
-            res["z_spacing"] = spacing[0]
-            res["version"] = version
-            accumulated_results = merge(accumulated_results, res)
-
-            centroid = np.round([res["x_mu"], res["y_mu"], res["z_mu"]], 1)
-            bead_name = "{}_Bead_X{}_Y{}_Z{}".format(res["image_name"], *centroid)
-            self.bead_imgs[bead_name] = summary_fig
-
-        if accumulated_results is not None:
-            self.results = create_result_table(results=accumulated_results)
-
-        if len(self.bead_imgs) > 0:
-            measurement_stack = np.stack(
-                [self.bead_imgs[k] for k in self.bead_imgs.keys()]
-            )
-            bead_scale = self._viewer.layers[self.cbox_img.currentText()].scale
-            bead_shape = self._viewer.layers[self.cbox_img.currentText()].data.shape
-
-            measurement_scale = np.array(
-                [
-                    bead_scale[0],
-                    bead_scale[1] / measurement_stack.shape[1] * bead_shape[1],
-                    bead_scale[1] / measurement_stack.shape[1] * bead_shape[1],
-                ]
-            )
-            return measurement_stack, measurement_scale
-
-    def delete_measurements(self):
+    def delete_measurement_action(self):
         idx = self._viewer.dims.current_step[0]
         self.results = self.results.drop(idx).reset_index(drop=True)
         tmp = {}
