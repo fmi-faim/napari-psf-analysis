@@ -1,3 +1,4 @@
+from os.path import join
 from typing import Optional, Tuple
 
 import numpy as np
@@ -71,14 +72,17 @@ class Analyzer:
             self._results = {}
             for key in result.keys():
                 self._results[key] = [result[key]]
+            self._results["PSF_path"] = []
         else:
             for key in result.keys():
                 self._results[key].append(result[key])
 
         centroid = np.round([result["x_mu"], result["y_mu"], result["z_mu"]], 1)
         bead_name = "{}_Bead_X{}_Y{}_Z{}".format(result["image_name"], *centroid)
+        unique_bead_name = self._make_unique(bead_name)
 
-        self._result_figures[self._make_unique(bead_name)] = summary_fig
+        self._result_figures[unique_bead_name] = summary_fig
+        self._results["PSF_path"].append(join(".", unique_bead_name + ".png"))
 
     def _make_unique(self, name: str):
         count = 1
@@ -224,5 +228,6 @@ class Analyzer:
                 "sde_cov_xy_2D": self._results["yx_cyx_sde"],
                 "sde_cov_yy_2D": self._results["yx_cyy_sde"],
                 "version": self._results["version"],
+                "PSF_path": self._results["PSF_path"],
             }
         )

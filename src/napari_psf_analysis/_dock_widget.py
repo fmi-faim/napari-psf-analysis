@@ -1,10 +1,10 @@
 import pathlib
 from datetime import datetime
+from importlib.metadata import version
 from os.path import basename, dirname, exists, getctime, join
 
 import napari.layers
 import numpy as np
-import pkg_resources
 import yaml
 from magicgui import magic_factory
 from napari import viewer
@@ -90,7 +90,7 @@ class PsfAnalysis(QWidget):
         napari_viewer.layers.events.removed.connect(self._layer_removed)
         napari_viewer.layers.selection.events.changed.connect(self._on_selection)
 
-        self.bead_imgs = None
+        self.summary_figs = None
         self.results = None
 
         self.cancel_extraction = False
@@ -117,7 +117,7 @@ class PsfAnalysis(QWidget):
         self.fill_layer_boxes()
 
     def _add_logo(self):
-        logo = pathlib.Path(__file__).parent / "resources/logo.png"
+        logo = pathlib.Path(__file__).parent / "resources" / "logo.png"
         logo_label = QLabel()
         logo_label.setText(f'<img src="{logo}" width="320">')
         self.layout().addWidget(logo_label)
@@ -435,6 +435,7 @@ class PsfAnalysis(QWidget):
                 )
                 self._viewer.dims.set_point(0, 0)
                 self._viewer.reset_view()
+                self.summary_figs = measurement_stack
             _reset_state()
 
         def _update_progress(progress: float):
@@ -480,7 +481,7 @@ class PsfAnalysis(QWidget):
                 point_data=point_data,
                 dpi=int(self.summary_figure_dpi.currentText()),
                 date=datetime(*self.date.date().getDate()).strftime("%Y-%m-%d"),
-                version=pkg_resources.get_distribution("napari_psf_analysis").version,
+                version=version("napari_psf_analysis"),
             )
         )
 
@@ -572,27 +573,36 @@ class PsfAnalysis(QWidget):
         return microscope
 
     def delete_measurement_action(self):
-        idx = self._viewer.dims.current_step[0]
-        self.results = self.results.drop(idx).reset_index(drop=True)
-        tmp = {}
-        for i, k in enumerate(self.bead_imgs.keys()):
-            if i != idx:
-                tmp[k] = self.bead_imgs[k]
-
-        self.bead_imgs = tmp
-        if len(self.bead_imgs) == 0:
-            self._viewer.layers.remove_selected()
+        if len(
+            self._viewer.layers.selection
+        ) > 0 and self._viewer.layers.selection.active.name.startswith(
+            "Analyzed " "Beads"
+        ):
+            idx = self._viewer.dims.current_step[0]
+            self.results = self.results.drop(idx).reset_index(drop=True)
+            if idx == 0:
+                self.summary_figs = self.summary_figs[1:]
+            elif idx == self.summary_figs.shape[0] - 1:
+                self.summary_figs = self.summary_figs[:-1]
+            else:
+                self.summary_figs = np.concatenate(
+                    [
+                        self.summary_figs[:idx],
+                        self.summary_figs[idx + 1 :],  # noqa: E203
+                    ]
+                )
+            if len(self.summary_figs) == 0:
+                self._viewer.layers.remove_selected()
+            else:
+                self._viewer.layers.selection.active.data = self.summary_figs
         else:
-            self._viewer.layers.selection.active.data = np.stack(
-                [self.bead_imgs[k] for k in self.bead_imgs.keys()]
-            )
+            show_info("Please select the 'Analyzed Beads' layer.")
 
     def save_measurements(self):
         outpath = self.save_dir_line_edit.text()
-        bead_paths = []
-        for k in self.bead_imgs.keys():
-            bead_paths.append(join("./", k + ".png"))
-            imsave(join(outpath, k + ".png"), self.bead_imgs[k])
+        for i, row in self.results.iterrows():
+            save_path = join(outpath, basename(row["PSF_path"]))
+            imsave(save_path, self.summary_figs[i])
 
         if self.temperature.text() != "":
             self.results["Temperature"] = self.temperature.value()
@@ -627,7 +637,6 @@ class PsfAnalysis(QWidget):
         if self.comment.text() != "":
             self.results["Comment"] = self.comment.text()
 
-        self.results["PSF_path"] = bead_paths
         entry = self.results.iloc[0]
         self.results.to_csv(
             join(

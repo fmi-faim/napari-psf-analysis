@@ -155,6 +155,7 @@ def test_results(analyzer: Analyzer):
         "sde_cov_xy_2D",
         "sde_cov_yy_2D",
         "version",
+        "PSF_path",
     ]
     for column in result_table.columns:
         assert column in cols
