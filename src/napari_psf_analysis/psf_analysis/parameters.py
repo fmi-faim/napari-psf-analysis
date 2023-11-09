@@ -6,7 +6,7 @@ from pydantic import BaseModel, PositiveFloat, PositiveInt
 
 class PSFAnalysisInputs(BaseModel):
     microscope: str
-    magnification: PositiveFloat
+    magnification: PositiveInt
     na: PositiveFloat
     spacing: Tuple[PositiveFloat, PositiveFloat, PositiveFloat]
     patch_size: Tuple[PositiveInt, PositiveInt, PositiveInt]
