@@ -82,7 +82,7 @@ class Analyzer:
         unique_bead_name = self._make_unique(bead_name)
 
         self._result_figures[unique_bead_name] = summary_fig
-        self._results["PSF_path"].append(join(".", unique_bead_name + ".png"))
+        self._results["PSF_path"].append(join(unique_bead_name + ".png"))
 
     def _make_unique(self, name: str):
         count = 1
