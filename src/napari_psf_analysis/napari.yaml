@@ -1,15 +1,15 @@
-name: napari-psf-analysis
+name: napari_psf_analysis
 schema_version: 0.1.0
 contributions:
   commands:
-  - id: napari-psf-analysis.set_config
+  - id: napari_psf_analysis.set_config
     title: Create set_config
     python_name: napari_psf_analysis._dock_widget:set_config
-  - id: napari-psf-analysis.PsfAnalysis
+  - id: napari_psf_analysis.PsfAnalysis
     title: Create Psf Analysis
     python_name: napari_psf_analysis._dock_widget:PsfAnalysis
   widgets:
-  - command: napari-psf-analysis.set_config
+  - command: napari_psf_analysis.set_config
     display_name: Set Config
-  - command: napari-psf-analysis.PsfAnalysis
+  - command: napari_psf_analysis.PsfAnalysis
     display_name: PSF Analysis
