@@ -438,7 +438,7 @@ class PsfAnalysis(QWidget):
                 self.summary_figs = measurement_stack
             _reset_state()
 
-        def _update_progress(progress: float):
+        def _update_progress(progress: int):
             self.progressbar.setValue(progress)
             if self.cancel_extraction:
                 worker.quit()
@@ -496,9 +496,9 @@ class PsfAnalysis(QWidget):
 
     def _setup_progressbar(self, point_data):
         self.progressbar.reset()
-        self.progressbar.setMaximum(0)
+        self.progressbar.setMinimum(0)
         self.progressbar.setMaximum(len(point_data))
-        self.progressbar.setValue(0.0001)
+        self.progressbar.setValue(0)
 
     def _get_img_name(self):
         img_layer = None
