@@ -12,7 +12,7 @@ This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookie
 ---
 ![application_screenshot](figs/napari-psf-analysis_demo.gif)
 <!-- start abstract -->
-A plugin to analyse point spread funcitons (PSFs) of optical systems.
+A plugin to analyse point spread functions (PSFs) of optical systems.
 <!-- end abstract -->
 ## Usage
 ### Starting Point
