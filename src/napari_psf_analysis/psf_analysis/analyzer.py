@@ -52,6 +52,19 @@ class Analyzer:
         else:
             raise StopIteration()
 
+    def get_averaged_bead(self):
+        """Average the raw bead data before analysis."""
+        # TODO: Implement a filter so it does not crash. Rn the program would have crashed regardless
+        # filtered_beads = [bead.data for bead in self.get_raw_beads_filtered()]
+        filtered_beads = [bead.data for bead in self._beads]
+        try:
+            averaged_bead_data = np.mean(filtered_beads, axis=0).astype(np.uint16)
+            averaged_bead = Calibrated3DImage(data=averaged_bead_data, spacing=self._parameters.spacing)
+            return averaged_bead
+        except (ValueError, AttributeError) as e:
+            print(f"Error getting average bead of {len(filtered_beads)} beads: {e}")
+
+
     def _extend_result_table(self, bead, results):
         extended_results = results.copy()
         extended_results["z_mu"] += bead.offset[0] * self._parameters.spacing[0]
