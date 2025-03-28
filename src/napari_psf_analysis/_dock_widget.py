@@ -429,7 +429,7 @@ class PsfAnalysis(QWidget):
                 self._viewer.add_image(
                     measurement_stack,
                     name="Analyzed Beads",
-                    interpolation="bicubic",
+                    interpolation2d="bicubic",
                     rgb=True,
                     scale=measurement_scale,
                 )
