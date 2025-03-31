@@ -452,7 +452,7 @@ class PsfAnalysis(QWidget):
 
         def display_measurement_stack(averaged_measurement, measurement_scale, name="PSF images"):
             """Display the averaged measurement stack in the viewer."""
-            self.viewer.add_image(
+            self._viewer.add_image(
                 averaged_measurement,
                 name=name,
                 interpolation2d="bicubic",
@@ -460,8 +460,8 @@ class PsfAnalysis(QWidget):
                 scale=measurement_scale,
             )
             # Resets napari viewer to 0.0
-            self.viewer.dims.set_point(0, 0)
-            self.viewer.reset_view()
+            self._viewer.dims.set_point(0, 0)
+            self._viewer.reset_view()
 
         def _update_progress(progress: int):
             self.progressbar.setValue(progress)

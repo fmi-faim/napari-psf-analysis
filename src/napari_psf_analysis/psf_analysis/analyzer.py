@@ -105,6 +105,15 @@ class Analyzer:
             count += 1
         return unique_name
 
+    def get_date(self):
+        return self._parameters.date
+
+    def get_version(self):
+        return self._parameters.version
+
+    def get_dpi(self):
+        return self._parameters.dpi
+
     def get_results(self) -> Optional[pd.DataFrame]:
         """Create result table from dict.
 
