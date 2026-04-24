@@ -72,7 +72,7 @@ def load_settings(psf_settings_path):
 
 def get_psf_analysis_settings_path():
     config_pointer = join(
-        dirname(get_settings()._config_path), "psf_analysis_config_pointer.yaml"
+        dirname(get_settings().config_path), "psf_analysis_config_pointer.yaml"
     )
     if exists(config_pointer):
         settings = load_settings(config_pointer)
@@ -128,7 +128,7 @@ class PsfAnalysis(QWidget):
         dir_selection_dialog = QWidget(parent=self)
         dir_selection_dialog.setLayout(QHBoxLayout())
         self.save_path = QFileDialog()
-        self.save_path.setFileMode(QFileDialog.DirectoryOnly)
+        self.save_path.setFileMode(QFileDialog.Directory)
         self.save_path.setDirectory(
             str(get_output_path(get_psf_analysis_settings_path()))
         )
