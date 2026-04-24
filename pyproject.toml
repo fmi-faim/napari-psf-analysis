@@ -91,6 +91,7 @@ cov-xml = "pytest --cov=src --cov-report xml"
 
 [tool.pixi.environments]
 default = { solve-group = "py311" }
+docs = { features = ["docs"], no-default-feature = true }
 py310 = { features = ["py310", "test"], solve-group = "py310" }
 py311 = { features = ["py311", "test"], solve-group = "py311" }
 py312 = { features = ["py312", "test"], solve-group = "py312" }
@@ -116,6 +117,13 @@ python = "3.12.*"
 
 [tool.pixi.feature.py313.dependencies]
 python = "3.13.*"
+
+[tool.pixi.feature.docs.dependencies]
+sphinx = ">=9.1.0,<10"
+myst-parser = ">=5.0.0,<6"
+sphinx-inline-tabs = ">=2025.12.21.14,<2026"
+sphinx-copybutton = ">=0.5.2,<0.6"
+furo = ">=2025.12.19,<2026"
 
 # [tool.pixi.feature.py314.dependencies]
 # python = "3.14.*"
