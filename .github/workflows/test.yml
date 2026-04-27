@@ -34,7 +34,9 @@ jobs:
       - uses: actions/checkout@v6
 
       # these libraries enable testing on Qt on linux
-      - uses: tlambert03/setup-qt-libs@v1
+      - uses: pyvista/setup-headless-display-action@v3
+        with:
+          qt: true
 
       # strategy borrowed from vispy for installing opengl libs on windows
       - name: Install Windows OpenGL
