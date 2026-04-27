@@ -12390,8 +12390,8 @@ packages:
   timestamp: 1773928432081
 - pypi: ./
   name: napari-psf-analysis
-  version: 1.1.6.dev1+gfe42815bf.d20260424
-  sha256: 1b96e1f9ae0363df85c4ba0157f5589f3d1129e18ee17cbaebeb152e23810451
+  version: 1.1.6.dev2+g8034bda6c.d20260427
+  sha256: 17ad7bfcd364c8bdaa97e73adbb90f274ec43e356316a83057c8160e7e3f19ac
   requires_dist:
   - matplotlib-scalebar>=0.9.0,<0.10
   - matplotlib>=3.1,<3.9
