@@ -30,6 +30,9 @@ dependencies = [
   "bfio>=2.3.6,<3",
   "qtpy>=2.4.3,<2.5",
   "pyyaml>=6.0.3,<7",
+  "pandas>=2.3.3,<3",
+  "pydantic>=2.13.3,<3",
+  "scipy>=1.15.2,<2",
 ]
 dynamic = ["version"]
 
@@ -86,6 +89,9 @@ matplotlib = ">=3.1,<3.9"
 pyyaml = ">=6.0.3,<7"
 qtpy = ">=2.4.3,<3"
 matplotlib-scalebar = ">=0.9.0,<0.10"
+pandas = ">=2.3.3,<3"
+pydantic = ">=2.13.3,<3"
+scipy = ">=1.15.2,<2"
 
 [dependency-groups]
 lint = ["mypy", "ruff"]

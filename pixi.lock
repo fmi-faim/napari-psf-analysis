@@ -13812,17 +13812,20 @@ packages:
   timestamp: 1773928432081
 - pypi: ./
   name: napari-psf-analysis
-  version: 1.1.6.dev6+g8b479eac9.d20260427
-  sha256: 68f744ed1763a8c380fbad721d01b2b26193fdb08d15a8b11e31205b692d277a
+  version: 1.1.6.dev8+gf337470bf.d20260427
+  sha256: e67ec385d575f8ef92168273efbf15d2a46d994870c0aca5994a582c34cb9922
   requires_dist:
   - bfio>=2.3.6,<3
   - matplotlib-scalebar>=0.9.0,<0.10
   - matplotlib>=3.1,<3.9
   - napari>=0.7.0,<0.8
   - numpy>=2.2.6,<3
+  - pandas>=2.3.3,<3
+  - pydantic>=2.13.3,<3
   - pyyaml>=6.0.3,<7
   - qtpy>=2.4.3,<2.5
   - scikit-image>=0.25.2,<0.27
+  - scipy>=1.15.2,<2
   requires_python: '>=3.10'
 - conda: https://conda.anaconda.org/conda-forge/noarch/napari-svg-0.2.1-pyha07c04f_0.conda
   sha256: 45e9a75c7af0f7b2ecc2f20932c289894a68b361033ca6657d620f342fdfaded
