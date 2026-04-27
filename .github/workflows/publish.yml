@@ -18,46 +18,46 @@ jobs:
 
     environment: release
     permissions:
-      id-token: write # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write # IMPORTANT: mandatory for trusted publishing
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-    # these libraries enable testing on Qt on linux
-    - uses: pyvista/setup-headless-display-action@v3
-      with:
-        qt: true
+      # these libraries enable testing on Qt on linux
+      - uses: pyvista/setup-headless-display-action@v3
+        with:
+          qt: true
 
-    # strategy borrowed from vispy for installing opengl libs on windows
-    - name: Install Windows OpenGL
-      if: runner.os == 'Windows'
-      run: |
-        git clone --depth 1 https://github.com/pyvista/gl-ci-helpers.git
-        powershell gl-ci-helpers/appveyor/install_opengl.ps1
+      # strategy borrowed from vispy for installing opengl libs on windows
+      - name: Install Windows OpenGL
+        if: runner.os == 'Windows'
+        run: |
+          git clone --depth 1 https://github.com/pyvista/gl-ci-helpers.git
+          powershell gl-ci-helpers/appveyor/install_opengl.ps1
 
-    - name: Set up Pixi
-      uses: prefix-dev/setup-pixi@v0.9.3
-      with:
-        cache: true
-        environments: >-
-          py310
-          build
+      - name: Set up Pixi
+        uses: prefix-dev/setup-pixi@v0.9.3
+        with:
+          cache: true
+          environments: >-
+            py310
+            build
 
-    - name: Test
-      run: pixi run --environment py310 test
+      - name: Test
+        run: pixi run --environment py310 test
 
-    - name: Build package
-      run: pixi run --environment build build
+      - name: Build package
+        run: pixi run --environment build build
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v6
-      with:
-        name: python-artifacts
-        path: dist/*
-        if-no-files-found: error
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: python-artifacts
+          path: dist/*
+          if-no-files-found: error
 
   publish:
     name: Publish to PyPI
@@ -68,7 +68,7 @@ jobs:
 
     permissions:
       contents: write
-      id-token: write # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write # IMPORTANT: mandatory for trusted publishing
 
     steps:
       - name: Download Python artifacts

@@ -668,7 +668,7 @@ def set_config(config_path=pathlib.Path.home()):
         settings = load_settings(config_path)
         if "microscopes" in settings.keys() or "output_path" in settings.keys():
             config_pointer_path = join(
-                dirname(get_settings()._config_path), "psf_analysis_config_pointer.yaml"
+                dirname(get_settings().config_path), "psf_analysis_config_pointer.yaml"
             )
 
             with open(config_pointer_path, "w") as yamlfile:
