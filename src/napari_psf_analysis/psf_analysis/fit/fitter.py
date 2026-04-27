@@ -122,7 +122,7 @@ class YXFitter:
 
     def _get_principal_components(
         self, optimal_params: ArrayLike
-    ) -> Tuple[float, float, float]:
+    ) -> Tuple[float, float]:
         yx_cov_matrix = np.array(
             [
                 [optimal_params[4], optimal_params[5]],
@@ -155,12 +155,12 @@ class YXFitter:
             x_mu_sde=error[3],
             yx_cyy_sde=error[4],
             yx_cyx_sde=error[5],
-            yx_cxx_sde=error[5],
+            yx_cxx_sde=error[6],
         )
 
 
 class ZYXFitter:
-    image: Calibrated3DImage = None
+    image: Calibrated3DImage
     _estimator: ZYXEstimator
 
     def __init__(self, image: Calibrated3DImage):
