@@ -30,11 +30,10 @@ repos:
     hooks:
       - id: black
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.15.0
+    rev: v3.21.2
     hooks:
       - id: pyupgrade
-        args: [--py37-plus, --keep-runtime-typing]
-  - repo: https://github.com/tlambert03/napari-plugin-checks
+  - repo: https://github.com/napari/napari-plugin-checks
     rev: v0.3.0
     hooks:
       - id: napari-plugin-checks
