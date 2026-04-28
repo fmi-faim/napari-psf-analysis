@@ -33,6 +33,8 @@ from skimage.io import imsave
 from napari_psf_analysis.psf_analysis.analyzer import Analyzer
 from napari_psf_analysis.psf_analysis.parameters import PSFAnalysisInputs
 
+from napari_psf_analysis.psf_analysis.psf import PSF
+
 
 def get_microscopes(psf_settings_path):
     if psf_settings_path and exists(psf_settings_path):
@@ -423,20 +425,43 @@ class PsfAnalysis(QWidget):
 
         self._setup_progressbar(point_data)
 
-        def _on_done(result):
+        def _on_done(result):  # TODO: Refactor this out of scope
             if result is not None:
-                measurement_stack, measurement_scale = result
-                self._viewer.add_image(
-                    measurement_stack,
-                    name="Analyzed Beads",
-                    interpolation2d="bicubic",
-                    rgb=True,
-                    scale=measurement_scale,
+
+                measurement_stack, measurement_scale, analyzer = result
+
+                # Creates an image of the average bead, runs the PSF analysis on it and creates summary image.
+                averaged_bead = analyzer.get_averaged_bead()
+                averaged_psf = PSF(image=averaged_bead)
+
+                averaged_psf.analyze()
+
+                averaged_summary_image = averaged_psf.get_summary_image(
+                    date=analyzer.get_date(),
+                    version=analyzer.get_version(),
+                    dpi=analyzer.get_dpi(),
                 )
-                self._viewer.dims.set_point(0, 0)
-                self._viewer.reset_view()
-                self.summary_figs = measurement_stack
+
+
+                # Combines the summary image from average bead with the summary image stack from the entire psf analysis.
+                averaged_summary_image_expanded = np.expand_dims(averaged_summary_image, axis=0)
+                combined_stack = np.concatenate((averaged_summary_image_expanded, measurement_stack), axis=0)
+                display_measurement_stack(combined_stack, measurement_scale)
+
             _reset_state()
+
+        def display_measurement_stack(averaged_measurement, measurement_scale, name="PSF images"):
+            """Display the averaged measurement stack in the viewer."""
+            self._viewer.add_image(
+                averaged_measurement,
+                name=name,
+                interpolation2d="bicubic",
+                rgb=True,
+                scale=measurement_scale,
+            )
+            # Resets napari viewer to 0.0
+            self._viewer.dims.set_point(0, 0)
+            self._viewer.reset_view()
 
         def _update_progress(progress: int):
             self.progressbar.setValue(progress)
@@ -467,7 +492,8 @@ class PsfAnalysis(QWidget):
             )
 
             if measurement_stack is not None:
-                return measurement_stack, measurement_scale
+                return measurement_stack, measurement_scale, analyzer
+
 
         worker: FunctionWorker = measure(
             parameters=PSFAnalysisInputs(
